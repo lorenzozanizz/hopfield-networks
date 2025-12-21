@@ -1,7 +1,6 @@
 #include <cstdio>
-#include <cblas.h>
-#include "io/plot/plot.hpp"
-#include "math/autograd/functions.hpp"
+
+#include "networks/states/binary.hpp"
 #include "math/autograd/variables.hpp"
 
 enum NeighbouringStrategy {
@@ -18,5 +17,13 @@ enum Stochasticity {
 
 // Just create the folder...
 int main() {
+	
+	using namespace autograd;
+	using namespace autograd::Ops;
+	using namespace autograd::Funcs;
+
+	VectorVariable u = create_vector_variable(140);
+	const auto func = exponential(sum(u, 1.0));
+
 }
 	

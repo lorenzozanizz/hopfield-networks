@@ -1,12 +1,22 @@
 #include "variables.hpp"
 
-
 template <typename FloatType = float>
-class Func {
+class Function {
+
+	const dim_t dimension;
+public:
 
 };
 
 template <typename FloatType = float>
-class StaticFunc : Func<FloatType> {
+class ScalarFunction : public Function<FloatType> {
 
 };
+
+template <typename FloatType = float>
+class VectorFunction : public Function<FloatType> {
+
+	VectorFunction(dim_t dim) { }
+
+};
+
