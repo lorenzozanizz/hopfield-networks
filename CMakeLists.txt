@@ -7,6 +7,9 @@ set(CMAKE_Fortran_COMPILER ${GFORTRAN_EXECUTABLE})
 
 project(project_title LANGUAGES CXX C Fortran)
 
+add_executable(main "src/main.cpp")
+add_executable(prog "src/math/autograd/math.f90")
+
 find_program(GNUPLOT_EXECUTABLE gnuplot)
 
 if (GNUPLOT_EXECUTABLE)
@@ -14,9 +17,14 @@ if (GNUPLOT_EXECUTABLE)
     # Require boost to link against the gnuplot header
     find_package(Boost REQUIRED)
 
-    add_compile_definitions(COMPILE_WITH_GNU)
+    add_library(gnuplot_io INTERFACE)
+    target_include_directories(gnuplot_io INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/external ) 
+    # target_link_libraries(gnuplot_io INTERFACE Boost ) 
+
+    # target_link_libraries(main PRIVATE gnuplot_io)
+
+    add_compile_definitions(COMPILE_WITH_GNUPLOT)
 else()
     message(STATUS "Gnuplot not found")
 endif()
 
-add_executable(main "src/main.cpp")

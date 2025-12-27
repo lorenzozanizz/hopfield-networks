@@ -3,8 +3,10 @@
 #define NETWORKS_STATES_BINARY_HPP
 
 #include <memory>
+#include <cstring>
 #include <stdexcept>
 #include <ctype.h>
+#include <math>
 
 #include "../network_types.hpp"
 
@@ -32,6 +34,9 @@ namespace hfnets {
 		// two indices is requested, the returnet value is ind1 * offset_y + ind2
 		state_size_t stride_y;
 		state_size_t stride_z;
+		// NOTE: stride_y should be read like "Stride to advance elements in y dimension"
+		// (like for a 2d array, to read column-wise you have a stride_y of row_size
+		// so that stride_y == row_size for 2d arrays)
 
 	public:
 
@@ -107,6 +112,45 @@ namespace hfnets {
 		inline long get(state_index_t bit_index) const {
 			return raw_data[bit_index >> 3] & mask_for(bit_index % 8);
 		}
+		
+		class BinaryStateIterator {
+
+			const BinaryState& bs;
+			long index;
+
+		public:
+			BinaryStateIterator(const BinaryState& c, long start)
+				: container(c), index(start) {
+				while (index < container.get_size() && !container.get(index)) {
+					++index;
+				}
+			}
+
+			// This is a constant iterator, you cannot edit the values
+			long operator*() const {
+				return index;
+			}
+
+			BinaryStateIterator& operator++() {
+				do {
+					++index;
+				} while (index < container.get_size() && !container.get(index));
+				return *this;
+			}
+
+			bool operator!=(const BinaryStateIterator& other) const {
+				return index != other.index;
+			}
+
+		};
+
+		BinaryStateIterator begin() const {
+			return NonZeroBitIterator(*this, 0);
+		}
+
+		BinaryStateIterator end() const {
+			return NonZeroBitIterator(*this, Dim);
+		}
 
 		protected:
 
@@ -114,11 +158,14 @@ namespace hfnets {
 			return ((unsigned long long) 1 << (unsigned long long) b);
 		}
 
+		friend std::ostream& operator<<(std::ostream& os, const BinaryState& ref);
 
 	};
 
 	void load_state_from_stream(std::istream& input, BinaryState& bs) {
 		// Load the state from an input stream (e.g. stdin or a file)
+		// Assume a human readable format ('1' and '0' instead of binary string
+
 	}
 
 	void load_state_from_byte_array(const unsigned char* raw_data, const state_size_t sz,
@@ -162,9 +209,42 @@ namespace hfnets {
 		return;
 	}
 
-	void write_state_as_byte_array(BinaryState& bs, unsigned char* raw_data, 
+	void write_state_as_byte_array(BinaryState& bs, unsigned char*& raw_data, 
 		unsigned char low_value = 0, unsigned char high_value = 255) {
+		if (raw_data == nullptr) {
+			// Allocate the required buffer amount
+			raw_data = new unsigned char[bs.get_size()];
+		} // Else we assume that the buffer is non null
+		// Use the explicit iterator interface of the binarystate class (its a bit slower but
+		// anyway)
+		auto it = bs.begin();
+		memset(raw_data, low_value, bs.get_size());
+		for (; it < bs.end(); ++it) {
+			raw_data[*it] = high_value;
+		}
+		return;
+	}
 
+}
+
+std::ostream& operator<<(std::ostream& os, const BinaryState& ref, bool human_readable = true, int dimension = 2) {
+	// Write the binary stream into the output stream. Should be easily read into
+	// python (for later purposes *.*)
+	os << ref.get_size() << ";\n"; // Declare size
+	// Dump everything
+	if (human_readable) {
+		// For ease, assume 2-d disposition by default
+		if (dimension == 2) {
+
+		}
+		else {
+			// Not implemented yet!
+		}
+	}
+	else {
+		// Just dump the raw stream. We do not assume that ref is sparse, e.g. there may be
+		// an even split of low_val and high_val, so just dump everything
+		
 	}
 
 }

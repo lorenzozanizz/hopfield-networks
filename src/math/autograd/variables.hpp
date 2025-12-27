@@ -6,6 +6,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+#include <map>
 #include <memory>
 
 namespace autograd {
@@ -51,12 +52,14 @@ namespace autograd {
         const ExpressionType type;
         // Note the reference to its own type, allowed because its just a pointer
         std::vector<ExpressionNode*> children;
+        dim_t dimension;
 
         // Anonymous union to contain all the node data, this is a 
-        // bit corny but reduces storage (which is significant)
+        // bit corny but reduces storage (which is significant when handling
+        // images)
         union {
             float vector_constant;
-            dim_t dimension;
+            unsigned long expr_id;
         } expression_data;
 
         ExpressionNode(ExpressionType t) : type(t) {}
@@ -66,7 +69,11 @@ namespace autograd {
         }
 
         void set_var_dimension(dim_t dimension) {
-            expression_data.dimension = dimension;
+            dimension = dimension;
+        }
+
+        void set_expression_id(unsigned long expr_id) {
+            expression_data.expr_id;
         }
 
         dim_t dimension() const {
@@ -76,9 +83,13 @@ namespace autograd {
     };
 
     // Very simple global owner for all nodes (no deallocation, OK for a toy base)
-    struct NodeGenerator {
+    class NodeGenerator {
+
+        using VectorVariable = ExpressionNode*;
 
         std::vector<std::unique_ptr<ExpressionNode>> nodes;
+
+    public:
 
         ExpressionNode* create_vector_variable(dim_t dimension) {
             nodes.emplace_back(
@@ -115,63 +126,116 @@ namespace autograd {
             nodes.clear();
         }
 
-    };
-
-    static NodeGenerator g_node_owner;
-
-    void release_node_ownership() {
-        // Explicitly release the ownership of the function nodes whenever
-        // the function has exhausted its scope. 
-        g_node_owner.dealloc_all();
-
-    }
-
-    ExpressionNode* create_vector_constant(dim_t dimension, float v) {
-        return g_node_owner.create_vector_constant(dimension, v);
-    }
-
-    ExpressionNode* create_vector_variable(dim_t dimension) {
-        return g_node_owner.create_vector_variable(dimension);
-    }
-
-    using VectorVariable = ExpressionNode*;
-
-    namespace Ops {
-
-        inline ExpressionNode* inverse(ExpressionNode* a) {
-            return g_node_owner.create_vector_op(ExpressionType::Inversion, { a });
-        }
-
-        inline ExpressionNode* sum(ExpressionNode* a, ExpressionNode* b) {
-            return g_node_owner.create_vector_op(ExpressionType::Add, { a, b });
-        }
-
-        inline ExpressionNode* sum(ExpressionNode* a, float v) {
-            const auto b = g_node_owner.create_vector_constant(a->dimension(), v);
-            return g_node_owner.create_vector_op(ExpressionType::Add, { a, b });
-        }
-
-        inline ExpressionNode* prod(ExpressionNode* a, ExpressionNode* b) {
-            return g_node_owner.create_vector_op(ExpressionType::Multiply, { a, b });
-        }
-
-
-    }
-
-    namespace Funcs {
-
         inline ExpressionNode* exponential(VectorVariable x) {
-            return g_node_owner.create_vector_op(ExpressionType::Exponentiation, { x });
+            return g_node_owner->create_vector_op(ExpressionType::Exponentiation, { x });
         }
 
         inline ExpressionNode* sigmoid(VectorVariable x) {
-            return g_node_owner.create_vector_op(ExpressionType::Sigmoid, { x });
+            return g_node_owner->create_vector_op(ExpressionType::Sigmoid, { x });
         }
 
         inline ExpressionNode* relu(VectorVariable x) {
-            return g_node_owner.create_vector_op(ExpressionType::Relu, { x });
+            return g_node_owner->create_vector_op(ExpressionType::Relu, { x });
         }
+
+        inline ExpressionNode* inverse(ExpressionNode* a) {
+            return g_node_owner->create_vector_op(ExpressionType::Inversion, { a });
+        }
+
+        inline ExpressionNode* sum(ExpressionNode* a, ExpressionNode* b) {
+            return g_node_owner->create_vector_op(ExpressionType::Add, { a, b });
+        }
+
+        inline ExpressionNode* sum(ExpressionNode* a, float v) {
+            // Create a virtual constant from the value v e.g. create
+            // a constant vector (just 1 float is stored, not O(n))
+            const auto b = g_node_owner->create_vector_constant(a->dimension(), v);
+            return g_node_owner->create_vector_op(ExpressionType::Add, { a, b });
+        }
+
+        inline ExpressionNode* prod(ExpressionNode* a, ExpressionNode* b) {
+            return g_node_owner->create_vector_op(ExpressionType::Multiply, { a, b });
+        }
+
+        inline ExpressionNode* exponential(VectorVariable x) {
+            return g_node_owner->create_vector_op(ExpressionType::Exponentiation, { x });
+        }
+
+        inline ExpressionNode* sigmoid(VectorVariable x) {
+            return g_node_owner->create_vector_op(ExpressionType::Sigmoid, { x });
+        }
+
+        inline ExpressionNode* relu(VectorVariable x) {
+            return g_node_owner->create_vector_op(ExpressionType::Relu, { x });
+        }
+
+    };
+
+    typedef struct {
+
+    } custom_op_t;
+
+    static std::map<unsigned long, custom_op_t> operation_registry;
+
+    void register_custom_operation(long op_id, void* func, void* par_der) {
+        // Register the custom operation on a static private registry
+        // operation_registry.insert(op_id, par_der);
     }
+
+    template <typename ScalarType = float>
+    class Function {
+
+        const dim_t vec_func_size;
+        // A node generator object is assigned to each function for thread
+        // safety and to avoid memory leaks: when the function goes out of
+        // scope, all its expression nodes are destroyed. Moreover this can
+        // be used to share expression nodes among different expressions for
+        // different function entries (
+        NodeGenerator node_generator;
+        std::vector<ExpressionNode*> vec_function;
+
+    public:
+
+        Function(
+            dim_t func_size
+        ) : vec_func_size(func_size), vec_function(func_size) { }
+
+        void operator() (ScalarType* raw_data, ScalarType* result) {
+            // See the notes  inside apply
+            apply(raw_data, result);
+        }
+
+        void apply(ScalarType* raw_data, ScalarType* result) {
+            // Assume complete data and output indipendence, so that
+            // processing for each vector entry can happen in paralell without
+            // any problem
+        }
+
+        dim_t get_func_size() {
+            return vec_func_size;
+        }
+
+        void flush_alloc_data() {
+            node_generator.dealloc_all();
+            vec_function.clear();
+        }
+
+        // Return a reference to its owned generator. 
+        NodeGenerator& generator() const {
+            return node_generator;
+        }
+
+        ExpressionNode*& operator[] (dim_t func_dim) {
+            return vec_function[func_dim];
+        }
+
+        void assign_all(ExpressionNode* expression) {
+            for (int i = 0; i < vec_func_size; ++i)
+                vec_function[i] = expression;
+        }
+
+    };
+
 
     /* INCOMPLETE: REQUIRES DISCUSSION..
     * 
