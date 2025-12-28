@@ -1,6 +1,6 @@
 #include <cstdio>
 
-#include "networks/states/binary.hpp"
+#include "hopfield/states/binary.hpp"
 #include "math/autograd/variables.hpp"
 
 #include "io/plot/plot.hpp"
@@ -8,14 +8,9 @@
 enum NeighbouringStrategy {
 	OneDNeighbouring,
 	TwoDNeighbouring,
-	// Treat the 
 	ThreeDNeighbouring
 };
 
-enum Stochasticity {
-	Deterministic,
-	Stochastic
-};
 
 // Just create the folder...
 int main() {
@@ -27,6 +22,7 @@ int main() {
 	auto u = g.create_vector_variable(140);
 	const auto expr = g.exponential(g.sum(u, 1.0));
 
-
+	GnuplotPipe gp;
+	gp.send_line("plot [-pi/2:pi] cos(x),-(sin(x) > sin(x+1) ? sin(x) : sin(x+1))");
 }
 	
