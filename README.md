@@ -6,7 +6,9 @@ This project uses the public domain header libraries [stb_image.h](https://githu
 [stb_image_write.h](https://github.com/nothings/stb) to read and write images. 
 Additionally the tracked history of states for certain networks can be exported to gifs 
 through a light wrapper to the [gif.h](https://github.com/charlietangora/gif-h) header-only
-public domain library gif-h. No ownership of the external headers is implied.
+public domain library gif-h. No ownership of the external headers is implied. Additionally we make use of the
+[gnuplot-iostream.h](https://github.com/dstahlke/gnuplot-iostream) interface to access the gnuplot subroutines
+for plotting.
 
 ## References
 
