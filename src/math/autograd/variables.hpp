@@ -31,6 +31,7 @@ namespace autograd {
         Exponentiation,
         Sigmoid,
         Relu,
+        Selector,
         // Summation of a vector variable excluding an index
         ExclusiveSummation,
         // Summation of a vector variable including the index
@@ -52,7 +53,7 @@ namespace autograd {
         const ExpressionType type;
         // Note the reference to its own type, allowed because its just a pointer
         std::vector<ExpressionNode*> children;
-        dim_t dimension;
+        dim_t dim;
 
         // Anonymous union to contain all the node data, this is a 
         // bit corny but reduces storage (which is significant when handling
@@ -62,14 +63,14 @@ namespace autograd {
             unsigned long expr_id;
         } expression_data;
 
-        ExpressionNode(ExpressionType t) : type(t) {}
+        ExpressionNode(ExpressionType t) : type(t) { }
 
         void set_value(float value) {
             expression_data.vector_constant = value;
         }
 
         void set_var_dimension(dim_t dimension) {
-            dimension = dimension;
+            dim = dimension;
         }
 
         void set_expression_id(unsigned long expr_id) {
@@ -77,7 +78,7 @@ namespace autograd {
         }
 
         dim_t dimension() const {
-            return expression_data.dimension;
+            return dim;
         }
 
     };
@@ -90,6 +91,13 @@ namespace autograd {
         std::vector<std::unique_ptr<ExpressionNode>> nodes;
 
     public:
+
+        NodeGenerator() : nodes() { }   
+
+        // Explicitly disallow copies, we are stories std::unique_ptr so
+        // compiler forbids us from having copy operators!
+        NodeGenerator(const NodeGenerator&) = delete;
+        NodeGenerator& operator=(const NodeGenerator) = delete;
 
         ExpressionNode* create_vector_variable(dim_t dimension) {
             nodes.emplace_back(
@@ -127,49 +135,76 @@ namespace autograd {
         }
 
         inline ExpressionNode* exponential(VectorVariable x) {
-            return g_node_owner->create_vector_op(ExpressionType::Exponentiation, { x });
+            return create_vector_op(ExpressionType::Exponentiation, { x });
         }
 
         inline ExpressionNode* sigmoid(VectorVariable x) {
-            return g_node_owner->create_vector_op(ExpressionType::Sigmoid, { x });
+            return create_vector_op(ExpressionType::Sigmoid, { x });
         }
 
         inline ExpressionNode* relu(VectorVariable x) {
-            return g_node_owner->create_vector_op(ExpressionType::Relu, { x });
+            return create_vector_op(ExpressionType::Relu, { x });
         }
 
         inline ExpressionNode* inverse(ExpressionNode* a) {
-            return g_node_owner->create_vector_op(ExpressionType::Inversion, { a });
+            return create_vector_op(ExpressionType::Inversion, { a });
         }
 
         inline ExpressionNode* sum(ExpressionNode* a, ExpressionNode* b) {
-            return g_node_owner->create_vector_op(ExpressionType::Add, { a, b });
+            return create_vector_op(ExpressionType::Add, { a, b });
         }
 
         inline ExpressionNode* sum(ExpressionNode* a, float v) {
             // Create a virtual constant from the value v e.g. create
             // a constant vector (just 1 float is stored, not O(n))
-            const auto b = g_node_owner->create_vector_constant(a->dimension(), v);
-            return g_node_owner->create_vector_op(ExpressionType::Add, { a, b });
+            const auto b = create_vector_constant(a->dimension(), v);
+            return create_vector_op(ExpressionType::Add, { a, b });
         }
 
         inline ExpressionNode* prod(ExpressionNode* a, ExpressionNode* b) {
-            return g_node_owner->create_vector_op(ExpressionType::Multiply, { a, b });
-        }
-
-        inline ExpressionNode* exponential(VectorVariable x) {
-            return g_node_owner->create_vector_op(ExpressionType::Exponentiation, { x });
-        }
-
-        inline ExpressionNode* sigmoid(VectorVariable x) {
-            return g_node_owner->create_vector_op(ExpressionType::Sigmoid, { x });
-        }
-
-        inline ExpressionNode* relu(VectorVariable x) {
-            return g_node_owner->create_vector_op(ExpressionType::Relu, { x });
+            return create_vector_op(ExpressionType::Multiply, { a, b });
         }
 
     };
+
+    class Differentiator {
+
+        using NodeCache = std::unordered_map<ExpressionNode*, ExpressionNode*>;
+
+        // Keep a differentiation frame to avoid explicit recursion, compute the
+        // derivative of a node when all of its required children are ready (either
+        // cached or computed before each node)
+        struct DiffFrame {
+            ExpressionNode* node;
+            std::vector<ExpressionNode*> dchildren;
+            bool ready;
+        };
+
+
+    public:
+        template <typename ScalarType>
+        ExpressionNode* differentiate(
+            ExpressionNode* root,
+            const dim_t var_index,
+            NodeGenerator& gen
+        ) {
+            NodeCache cache;
+            return differentiate(root, var_index, gen, cache);
+        }
+
+        ExpressionNode* differentiate(
+            ExpressionNode* node,
+            const dim_t var_index,
+            NodeGenerator& gen,
+            NodeCache& cache
+        ) {
+            const auto it = cache.find(node);
+            if (it != cache.end()) return it->second;
+           
+            return nullptr;
+        }
+    };
+
 
     typedef struct {
 
@@ -200,7 +235,7 @@ namespace autograd {
             dim_t func_size
         ) : vec_func_size(func_size), vec_function(func_size) { }
 
-        void operator() (ScalarType* raw_data, ScalarType* result) {
+        void operator() (const ScalarType* raw_data, ScalarType* result) {
             // See the notes  inside apply
             apply(raw_data, result);
         }
@@ -221,12 +256,8 @@ namespace autograd {
         }
 
         // Return a reference to its owned generator. 
-        NodeGenerator& generator() const {
+        NodeGenerator& generator() {
             return node_generator;
-        }
-
-        ExpressionNode*& operator[] (dim_t func_dim) {
-            return vec_function[func_dim];
         }
 
         void assign_all(ExpressionNode* expression) {
@@ -234,7 +265,20 @@ namespace autograd {
                 vec_function[i] = expression;
         }
 
+        ExpressionNode*& operator[] (dim_t func_dim) {
+            return vec_function[func_dim];
+        }
+
+        ExpressionNode* component_expr(dim_t comp_index) {
+            return vec_function[comp_index];
+        }
+
+        void jacobian(const ScalarType* raw_input, ScalarType* output) {
+
+        }
+        
     };
+
 
 
     /* INCOMPLETE: REQUIRES DISCUSSION..

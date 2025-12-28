@@ -6,7 +6,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <ctype.h>
-#include <math>
+#include <cmath>
 
 #include "../network_types.hpp"
 
@@ -116,12 +116,12 @@ namespace hfnets {
 		class BinaryStateIterator {
 
 			const BinaryState& bs;
-			long index;
+			unsigned long index;
 
 		public:
 			BinaryStateIterator(const BinaryState& c, long start)
-				: container(c), index(start) {
-				while (index < container.get_size() && !container.get(index)) {
+				: bs(c), index(start) {
+				while (index < bs.get_size() && !bs.get(index)) {
 					++index;
 				}
 			}
@@ -134,7 +134,7 @@ namespace hfnets {
 			BinaryStateIterator& operator++() {
 				do {
 					++index;
-				} while (index < container.get_size() && !container.get(index));
+				} while (index < bs.get_size() && !bs.get(index));
 				return *this;
 			}
 
@@ -142,14 +142,18 @@ namespace hfnets {
 				return index != other.index;
 			}
 
+			bool operator==(const BinaryStateIterator& other) const {
+				return index == other.index;
+			}
+
 		};
 
 		BinaryStateIterator begin() const {
-			return NonZeroBitIterator(*this, 0);
+			return BinaryStateIterator(*this, 0);
 		}
 
 		BinaryStateIterator end() const {
-			return NonZeroBitIterator(*this, Dim);
+			return BinaryStateIterator(*this, size);
 		}
 
 		protected:
@@ -219,34 +223,24 @@ namespace hfnets {
 		// anyway)
 		auto it = bs.begin();
 		memset(raw_data, low_value, bs.get_size());
-		for (; it < bs.end(); ++it) {
+		for (; it != bs.end(); ++it) {
 			raw_data[*it] = high_value;
 		}
 		return;
 	}
+	
+	void write_state_into_stream(std::ostream& os, const hfnets::BinaryState& ref, unsigned int dimension = 2, bool human_readable = true) {
+
+	}
 
 }
 
-std::ostream& operator<<(std::ostream& os, const BinaryState& ref, bool human_readable = true, int dimension = 2) {
+std::ostream& operator<<(std::ostream& os, const hfnets::BinaryState& ref) {
 	// Write the binary stream into the output stream. Should be easily read into
 	// python (for later purposes *.*)
-	os << ref.get_size() << ";\n"; // Declare size
+	os << ref.get_size(); // Declare size
 	// Dump everything
-	if (human_readable) {
-		// For ease, assume 2-d disposition by default
-		if (dimension == 2) {
-
-		}
-		else {
-			// Not implemented yet!
-		}
-	}
-	else {
-		// Just dump the raw stream. We do not assume that ref is sparse, e.g. there may be
-		// an even split of low_val and high_val, so just dump everything
-		
-	}
-
+	return os;
 }
 
 #endif //!NETWORKS_STATES_BINARY_HPP

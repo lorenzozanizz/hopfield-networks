@@ -8,7 +8,7 @@ set(CMAKE_Fortran_COMPILER ${GFORTRAN_EXECUTABLE})
 project(project_title LANGUAGES CXX C Fortran)
 
 add_executable(main "src/main.cpp")
-add_executable(prog "src/math/autograd/math.f90")
+# add_executable(prog "src/math/autograd/math.f90")
 
 find_program(GNUPLOT_EXECUTABLE gnuplot)
 

@@ -21,12 +21,10 @@ enum Stochasticity {
 int main() {
 	
 	using namespace autograd;
-	using namespace autograd::Ops;
-	using namespace autograd::Funcs;
 	
 	Function func(1); // a scalar function
-	auto g = func.generator();
-	VectorVariable u = g.create_vector_variable(140);
+	auto& g = func.generator();
+	auto u = g.create_vector_variable(140);
 	const auto expr = g.exponential(g.sum(u, 1.0));
 
 
