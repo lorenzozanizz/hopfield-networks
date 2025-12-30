@@ -12,7 +12,12 @@
 #pragma warning(disable:4996)
 #endif
 
+#include "../../utils/preprocessor.hpp"
+
+#pragma message ( Warning "Using the gnuplot module on a read-only filesystem is unstable." )
+
 #include <stdio.h>
+#include <functional>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -25,6 +30,7 @@ protected:
 
     FILE* pipe;
     std::vector<std::string> buffer;
+    std::function<void(void)> on_close;
 
     // Delete copies to avoid messing with pipes
     GnuplotPipe(GnuplotPipe const&) = delete;
@@ -40,7 +46,12 @@ public:
         //     throw std::runtime_error("Failed to create the gnuplot pipe")
     }
 
+    void set_on_close(std::function<void(void)> on_cl_callback) {
+        on_close = on_cl_callback;
+    }
+
     ~GnuplotPipe() {
+
         close();
     }
 
@@ -49,16 +60,23 @@ public:
     }
 
     void close() {
-        if (pipe) 
+        if (on_close)
+            on_close();
+        if (pipe) {
+            send_line("reset session");
+            send_line("quit");
             pclose(pipe);
+        }
     }
 
-    void send_line(const std::string& text, bool use_buffer = false) {
-        if (!pipe) return;
-        if (use_buffer)
-            buffer.push_back(text + "\n");
-        else
-            fputs((text + "\n").c_str(), pipe);
+    GnuplotPipe& send_line(const std::string& text, bool use_buffer = false) {
+        if (pipe) {
+            if (use_buffer)
+                buffer.push_back(text + "\n");
+            else
+                fputs((text + "\n").c_str(), pipe);
+        }
+        return *this;
     }
 
     void flush_send_end_of_data(unsigned repeat_buffer = 1) {
@@ -80,6 +98,10 @@ public:
         for (auto& line : buffer)
             file_out << line;
         file_out.close();
+    }
+
+    FILE* raw() {
+        return pipe;
     }
 
 };

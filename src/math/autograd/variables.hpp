@@ -43,6 +43,17 @@ namespace autograd {
 
     };
 
+    // Lightweight reference to a matrix laid out in memory
+    class MatrixReference {
+
+        void relocate();
+    };
+
+    class VectorReference {
+
+        void relocate();
+    };
+
     // Forward declaration just to be sure
     class ExpressionNode;
 
@@ -130,6 +141,20 @@ namespace autograd {
             return nodes.back().get();
         }
 
+        ExpressionNode* create_vector_op(ExpressionType type,
+            const std::initializer_list<ExpressionNode*> children) {
+            // Overload to allow more comfortable initializer list expressions
+            nodes.emplace_back(
+                std::make_unique<ExpressionNode>(type)
+            );
+            // Handle the case where no children may be present
+            if (children.size()) {
+                nodes.back()->children = children;
+                nodes.back()->set_var_dimension((*children.begin())->dimension());
+            }
+            return nodes.back().get();
+        }
+
         void dealloc_all() {
             nodes.clear();
         }
@@ -163,6 +188,10 @@ namespace autograd {
 
         inline ExpressionNode* prod(ExpressionNode* a, ExpressionNode* b) {
             return create_vector_op(ExpressionType::Multiply, { a, b });
+        }
+
+        inline ExpressionNode* matmul(ExpressionNode* a) {
+            return create_vector_op(ExpressionType::Multiply, { a });
         }
 
     };
@@ -278,60 +307,6 @@ namespace autograd {
         }
         
     };
-
-
-
-    /* INCOMPLETE: REQUIRES DISCUSSION..
-    * 
-    // Evaluation of a node given a vectorial input 
-    float eval_node(ExpressionNode* expression,
-        const float* input,
-        std::unordered_map<Node*, float>& expression_cache
-    ) {
-        // First interrogate the expression cache to see if the value was
-        // already cached. Note that caching values may be somewhat expensive...
-        auto it = cache.find(n);
-        if (it != cache.end()) {
-            return it->second;
-        }
-        // Use an explicit cache to keep intermediate results.
-        // Also use an explicit stack to avoid possible overflow for nested expressions
-        // (also makes code generation more comfy)
-
-        float result = 0.0f;
-        switch (n->type) {
-        case Node::Type::VAR: {
-            result = x[n->var_index];
-            break;
-        }
-        case Node::Type::CONST: {
-            result = n->value;
-            break;
-        }
-        case Node::Type::ADD: {
-            float a = eval_node(n->children[0], x, cache);
-            float b = eval_node(n->children[1], x, cache);
-            result = a + b;
-            break;
-        }
-        case Node::Type::MUL: {
-            float a = eval_node(n->children[0], x, cache);
-            float b = eval_node(n->children[1], x, cache);
-            result = a * b;
-            break;
-        }
-        case Node::Type::EXP: {
-            float a = eval_node(n->children[0], x, cache);
-            result = std::exp(a);
-            break;
-        }
-        }
-
-        cache[n] = result;
-        return result;
-    }
-
-    */
 
 } // ! namespace autograd
 
