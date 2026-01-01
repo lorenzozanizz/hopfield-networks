@@ -180,6 +180,8 @@ public:
             // We use the data we collected internally in the nvc instead of reading 
             // the same file we dumped from memory. 
             for (const auto& pair : nvc) {
+                if (!pair.second.size())
+                    continue;
                 auto ctx = plotter->context();
                 ctx.set_title("Evolution of " + pair.first).
                     set_x_label("Iteration steps").plot_sequence(pair.second);

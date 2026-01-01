@@ -4,10 +4,13 @@
 
 class ReservoirLogger {
 
-	on_state_change() {
+	void on_state_change() {
 
 	}
 
+	void on_run_begin() {
+
+	}
 };
 
 #endif

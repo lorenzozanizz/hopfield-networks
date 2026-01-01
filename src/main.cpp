@@ -2,11 +2,21 @@
 #include <memory>
 #include <iostream>
 
+// Hopfield networks
 #include "hopfield/states/binary.hpp"
 #include "hopfield/deterministic/dense_hopfield_network.hpp"
 #include "hopfield/deterministic/cross_talk_visualizer.hpp"
 #include "hopfield/logger/logger.hpp"
+
+// Reservoir computing
 #include "math/autograd/variables.hpp"
+#include "reservoir/reservoir.hpp"
+#include "reservoir/reservoir_predictor.hpp"
+#include "reservoir/reservoir_logger.hpp"
+
+// Konohen mappings
+
+// Restricted Boltzmann machines
 
 #include "io/plot/plot.hpp"
 #include "io/gif/gif.hpp"
