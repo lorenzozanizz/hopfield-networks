@@ -12,6 +12,9 @@
 #include "io/gif/gif.hpp"
 #include "io/image/images.hpp"
 
+#include "math/matrix/sparse_matrix.hpp"
+#include "math/matrix/sparse_vector.hpp"
+
 enum NeighbouringStrategy {
 	OneDNeighbouring,
 	TwoDNeighbouring,

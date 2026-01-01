@@ -1,6 +1,7 @@
 #ifndef SPARSE_MATRIX_HPP
 #define SPARSE_MATRIX_HPP
 
+#include "sparse_vector.hpp"
 #include <unordered_map>
 
 class SparseMatrix {
@@ -34,17 +35,17 @@ public:
         data.insert_or_assign(idx, value);
     }
 
-    std::size_t numRows() const { return this.rows; }
-    std::size_t numCols() const { return this.cols; }
+    std::size_t numRows() const { return this->rows; }
+    std::size_t numCols() const { return this->cols; }
 
-    std::size_t nonZeroCount() { return data.size; }
+    std::size_t nonZeroCount() { return data.size(); }
 
     SparseMatrix operator*(const SparseMatrix& other) {
-        if (this.cols != other.rows) {
+        if (this->cols != other.rows) {
             throw std::invalid_argument("Matrix size mismatch");
         }
 
-        SparseMatrix result(this.rows, other.cols);
+        SparseMatrix result(this->rows, other.cols);
 
         for (const auto& [idxA, valA] : data) {
             std::size_t row = idxA / cols; // row of the element
@@ -63,7 +64,7 @@ public:
 
     SparseMatrix operator*(const double x) {
 
-        SparseMatrix result(this.rows, this.cols);
+        SparseMatrix result(this->rows, this->cols);
 
         for (const auto& [idxA, valA] : data) {
             
@@ -73,13 +74,13 @@ public:
 
         return result;
     }
-
-    SparseVector operator*(const std::vector& other) {
-        if (this.cols != other.size()) {
+   
+    SparseVector operator*(const std::vector<double>& other) {
+        if (this->cols != other.size()) {
             throw std::invalid_argument("Matrix size mismatch");
         }
 
-        SparseVector result();
+        SparseVector result(other.size());
 
         for (const auto& [idxA, valA] : data) {
             std::size_t row = idxA / cols; // row of the element
@@ -94,11 +95,11 @@ public:
     }
 
     SparseVector operator*(const SparseVector& other) {
-        if (this.cols != other.size()) {
+        if (this->cols != other.size()) {
             throw std::invalid_argument("Matrix size mismatch");
         }
 
-        SparseVector result();
+        SparseVector result(other.size());
 
         for (const auto& [idxA, valA] : data) {
             std::size_t row = idxA / cols; // row of the element
@@ -111,9 +112,10 @@ public:
 
         return result;
     }
+   
 
     double product_row_vector(size_t row, const SparseVector& other) {
-        if (this.cols != other.size()) {
+        if (this->cols != other.size()) {
             throw std::invalid_argument("Matrix size mismatch");
         }
 
@@ -134,8 +136,12 @@ public:
         return result;
     }
 
-    double product_row_vector(size_t row, const std::vector& other) {
-        if (this.cols != other.size()) {
+
+    
+
+    double product_row_vector(size_t row, const std::vector<double>& other) {
+
+        if (this->cols != other.size()) {
             throw std::invalid_argument("Matrix size mismatch");
         }
 

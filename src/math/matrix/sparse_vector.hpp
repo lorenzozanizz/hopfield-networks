@@ -29,13 +29,13 @@ public:
         data.insert_or_assign(index(idx), value);
     }
 
-    std::size_t size() const { return this.dim; }
+    std::size_t size() const { return this->dim; }
   
-    std::size_t nonZeroCount() { return data.size; }
+    std::size_t nonZeroCount() { return this->data.size(); }
 
     SparseVector operator*(const double x) {
 
-        SparseVector result(this.rows, this.cols);
+        SparseVector result(this->size());
 
         for (const auto& [idxA, valA] : data) {
 
