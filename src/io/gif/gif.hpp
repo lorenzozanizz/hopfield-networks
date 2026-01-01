@@ -36,6 +36,8 @@ protected:
 
 public:
 
+	static constexpr const unsigned int required_channels = 4;
+
 	GifWriterIO() { }
 
 	GifWriterIO(const std::string name, unsigned int width, unsigned int height,

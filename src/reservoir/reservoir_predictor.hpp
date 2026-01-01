@@ -4,6 +4,8 @@
 
 class ReservoirPredictor {
 
+	unsigned int output_size;
+
 };
 
 #endif

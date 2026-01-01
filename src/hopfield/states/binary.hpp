@@ -1,6 +1,6 @@
 #pragma once
-#ifndef NETWORKS_STATES_BINARY_HPP
-#define NETWORKS_STATES_BINARY_HPP
+#ifndef HOPFIELD_STATES_BINARY_HPP
+#define HOPFIELD_STATES_BINARY_HPP
 
 #include <memory>
 #include <cstring>
@@ -45,9 +45,28 @@ public:
 
 	BinaryState(): size(0) { }
 
-	BinaryState(state_size_t sz) : size(sz) {
+	BinaryState(state_size_t sz) : size(sz), raw_data(nullptr) {
 		raw_data = std::make_unique<byte[]>((sz >> 3) + 1);
 		stride_y = stride_z = 0;
+	}
+
+	BinaryState& operator=(const BinaryState& ref) {
+		raw_data.reset(new unsigned char[ref.byte_size()]);
+		memcpy(raw_data.get(), ref.data(), ref.byte_size());
+
+		stride_y = ref.stride_y;
+		stride_z = ref.stride_z;
+		size = ref.size;
+
+		return *this;
+	}
+
+	void copy_content(const BinaryState& ref) {
+		if (ref.get_size() != size) {
+			throw std::runtime_error("Attempting to copy the content of a state with a different size.");
+		}
+		raw_data.reset(new unsigned char[ref.byte_size()]);
+		memcpy(raw_data.get(), ref.data(), ref.byte_size());
 	}
 
 	void set_size(state_size_t sz) {
@@ -70,12 +89,23 @@ public:
 		return stride_z;
 	}
 
+	bool stride_equals(const BinaryState& other) {
+		return (other.stride_y == stride_y && other.stride_z == stride_z);
+	}
 
-	void realloc() {
+	void realloc(bool initialize = true) {
 		// Notice that this implicitly calls the distructor delete[] for
 		// the previous raw_data value, explicitly deallocating the old
 		// memory.
 		raw_data = std::make_unique<byte[]>((size >> 3) + 1);
+		if (initialize)
+			clear();
+	}
+	
+	void clear() {
+		// Clear the entire memory pool
+		if (raw_data)
+			std::memset(raw_data.get(), 0, byte_size());
 	}
 
 	inline int operator()(state_index_t ind_i, state_index_t ind_j, state_index_t ind_k) const {
@@ -167,6 +197,10 @@ public:
 			return index != other.index;
 		}
 
+		bool operator<(const BinaryStateIterator& other) const {
+			return index < other.index;
+		}
+
 		bool operator==(const BinaryStateIterator& other) const {
 			return index == other.index;
 		}
@@ -223,7 +257,7 @@ namespace StateUtils {
 		state_index_t i = 0;
 		unsigned char byte_buffer = 0x00;
 
-		for (i = 0; i < bs.get_size(); ++i) {
+		for (i = 0; i < sz; ++i) {
 			if (raw_data[i] == high_value)
 				bs.set(i);
 			else {
@@ -260,6 +294,25 @@ namespace StateUtils {
 		load_state_from_byte_array(bs, image.data(), bs.get_size());
 	}
 
+	void write_state_as_image(const BinaryState& bs, const std::string& img, const std::string& ext = "png") {
+		std::unique_ptr<unsigned char[]> intermediate_buf(new unsigned char[bs.get_size()]);
+		memset(intermediate_buf.get(), 0, bs.get_size());
+
+		const auto width = bs.get_stride_y();
+		const auto height = bs.get_size() / bs.get_stride_y();
+
+		if (!width || !height)
+			throw std::runtime_error("Cannot write to image " + img + ": state has no interpretable stride");
+
+		if (ext == "jpg") {
+			ImageWriter::write_jpg(img, intermediate_buf.get(), width, height, Channels::Greyscale);
+		}
+		else if (ext == "png") {
+			ImageWriter::write_png(img, intermediate_buf.get(), width, height, Channels::Greyscale);
+
+		}
+	}
+
 
 	void write_state_as_byte_array(BinaryState& bs, unsigned char*& raw_data,
 		unsigned char low_value = 0, unsigned char high_value = 255) {
@@ -275,10 +328,6 @@ namespace StateUtils {
 			raw_data[*it] = high_value;
 		}
 		return;
-	}
-
-	void write_state_into_stream(std::ostream& os, const BinaryState& ref, unsigned int dimension = 2, bool human_readable = true) {
-
 	}
 
 	void perturb_state(BinaryState& bs, float alpha, unsigned long long seed = 0xcafebabe) {
@@ -327,9 +376,9 @@ std::ostream& operator<<(std::ostream& os, const BinaryState& ref) {
 		}
 	}
 	else {
-
+		throw std::runtime_error("3D state printing not supported");
 	}
 	return os;
 }
 
-#endif //!NETWORKS_STATES_BINARY_HPP
+#endif //!HOPFIELD_STATES_BINARY_HPP

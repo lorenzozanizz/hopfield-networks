@@ -18,8 +18,8 @@ enum class Channels {
 
 	KeepOriginalChannel = 0,
 	Greyscale = 1,
-	ForceRGBChannel = 3,
-	ForceRGBAChannel = 4
+	RGB = 3,
+	RGBA = 4
 
 };
 
@@ -47,7 +47,7 @@ public:
 		raw_data = stbi_load(file_name.c_str(), &width, &height, &orig_channels,
 			static_cast<unsigned int>(force_ch));
 		channels = static_cast<unsigned int>(force_ch);
-		if (w != width || h != height || ch != channels)
+		if (!raw_data || w != width || h != height || ch != channels)
 			throw std::runtime_error("Failed to load the required image: dimensions mismatch.");
 	}
 
@@ -55,7 +55,7 @@ public:
 		did_free = false;
 		raw_data = stbi_load(file_name.c_str(), &width, &height, &orig_channels, static_cast<unsigned int>(force_ch));
 		channels = static_cast<unsigned int>(force_ch);
-		if (width <= 0 || height <= 0)
+		if (!raw_data || width <= 0 || height <= 0)
 			throw std::runtime_error("Could not open the image " + file_name);
 	}
 	
@@ -69,8 +69,9 @@ public:
 
 	// Allow explicit deallocation (larger images are somewhat memory heavy, e.g. 100s kb)
 	void free() {
+		if (!did_free)
+			stbi_image_free(raw_data);
 		did_free = true;
-		stbi_image_free(raw_data);
 	}
 
 	~Image() {
@@ -79,6 +80,41 @@ public:
 		free();
 	}
 
+};
+
+class ImageWriter {
+public:
+
+	static void write_png(const char* file_name, unsigned char* raw_data, unsigned int width,
+		unsigned int height, const Channels ch) {
+
+		if (!raw_data)
+			throw std::runtime_error("Cannot write a null image.");
+		stbi_write_png(file_name, width, height, static_cast<unsigned int>(ch), raw_data,
+			/* stride */
+		 	width * static_cast<unsigned int>(ch));
+	}
+
+	static void write_png(const std::string& file_name, unsigned char* raw_data, unsigned int width,
+		unsigned int height, const Channels ch) {
+		write_png(file_name.data(), raw_data, width, height, ch);
+	}
+
+	static void write_jpg(const char* file_name, unsigned char* raw_data, unsigned int width,
+		unsigned int height, const Channels ch) {
+		if (ch == Channels::RGBA)
+			throw std::runtime_error("Cannot write a jpg with a transparency channel.");
+		else if (!raw_data)
+			throw std::runtime_error("Cannot write a null image.");
+		stbi_write_jpg(file_name, width, height, static_cast<unsigned int>(ch), raw_data,
+			/* compression_quality! */
+			100);
+	}
+ 
+	static void write_jpg(const std::string& file_name, unsigned char* raw_data, unsigned int width,
+		unsigned int height, const Channels ch) {
+		write_jpg(file_name.data(), raw_data, width, height, ch);
+	}
 };
 
 namespace ImageUtils {
@@ -113,10 +149,10 @@ namespace ImageUtils {
 		// https://en.wikipedia.org/wiki/Otsu%27s_method
 		// to binarize the image. This is less naive than a threshold binarization. 
 
-		static int hist[256] = { 0 };
+		// This is thread safe but uses 4*256 = 1kb of stack 
+		/* static */ int hist[256] = {0};
 
 		// Assumes that the image binary is an image with a greyscale channel. 
-
 		if (img.channels != 1)
 			throw std::invalid_argument("Failed to binarize the required image: not black and white");
 

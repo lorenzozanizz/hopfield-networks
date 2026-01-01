@@ -24,11 +24,13 @@ autograd_compile() {
 
 	using namespace autograd;
 	
-	Function func(1); // a scalar function
+	ScalarFunction func; // a scalar function
 	auto& g = func.generator();
 	auto u = g.create_vector_variable(140);
-	const auto expr = g.exponential(g.sum(u, 1.0));
+	const auto expr = g.squared_norm(g.sigmoid(g.sum(u, 1.0)));
+	func = expr;
 
+	std::cout << func;
 }
 
 void
@@ -36,7 +38,7 @@ hopfield_compile() {
 
 	Plotter p;
 
-	DenseHopfieldNetwork<HebbianPolicy> dhn(20 * 20);
+	DenseHopfieldNetwork<HebbianPolicy> dhn(40 * 40);
 
 	BinaryState bs1(40 * 40), bs2(40*40), bs3(40*40);
 	auto img1 = "flower.png";
@@ -54,7 +56,7 @@ hopfield_compile() {
 	bs1.set_stride_y(40); // mark the state as 2 dimensional, 40 x 40
 	StateUtils::plot_state(p, bs1);
 
-	std::cout << "Loaded image!";
+	std::cout << "Loaded image!" << std::endl;
 	dhn.store(bs1);
 
 	StateUtils::load_state_from_image(bs2, img2, /* binarize */ true);
@@ -62,29 +64,34 @@ hopfield_compile() {
 
 	StateUtils::load_state_from_image(bs3, img3, /* binarize */ true);
 	dhn.store(bs3);
+	
+	auto& weighting_policy = dhn.weighting_policy();
 
 	// Create and open a text file 
-	auto logger = HopfieldLogger();
+	auto logger = HopfieldLogger(&p);
 	std::ofstream save_file("save_data.txt");
 	logger.set_recording_stream(save_file, /* close_after */ true);
 
 	dhn.attach_logger(&logger);
-	logger.collect_states(true, "states.gif");
-	logger.collect_energy(true);
-	logger.collect_temperature(true);
-	logger.collect_order_parameter(true);
+	logger.set_collect_states(true, "states.gif");
+	logger.set_collect_energy(true);
+	logger.set_collect_temperature(true);
+	logger.set_collect_order_parameter(true);
 
-	logger.finally_write_last_state_png("last_state.png");
+	logger.finally_write_last_state_png(true, "last_state.png");
 	logger.finally_plot_data(true);
 	
 	StateUtils::perturb_state(bs1, /* Noise intensity 0 to 1*/ 0.15);
-
+	std::cout << "Plotting state!" << std::endl;
 	StateUtils::plot_state(p, bs1);
 
 	UpdateConfig uc = {
 		UpdatePolicy::OnlineUpdate
 	};
 
+
+	// Instruct the network that we wish to interpret the state as a 40x40 raster.
+	dhn.set_state_strides(40);
 	dhn.run(bs1, 20, uc);
 	dhn.detach_logger(&logger);
 

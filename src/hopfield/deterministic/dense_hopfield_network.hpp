@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <iostream>
 
 #include "../../io/plot/plot.hpp"
 
@@ -40,7 +41,7 @@ class DenseHopfieldNetwork {
 
 public:
 
-	DenseHopfieldNetwork(state_size_t size) : loggers(1), policy(size), binary_state(size) {
+	DenseHopfieldNetwork(state_size_t size) : policy(size), binary_state(size) {
 		// By interface allow policies to have lazy allocation
 		policy.allocate();
 	}
@@ -56,20 +57,65 @@ public:
 		loggers.push_back(logger);
 	}
 
+	WeightingPolicy& weighting_policy() {
+		return policy;
+	}
+
+	BinaryState& get_state() {
+		return binary_state;
+	}
+
 	// This ...
 	void store(BinaryState& bs);
 
-	void run(BinaryState& binary_state, const unsigned long iterations, const UpdateConfig uc) {
+	void set_state_strides(unsigned int stride_y, unsigned int stride_z = 0) {
+		binary_state.set_stride_y(stride_y);
+		if (stride_z)
+			binary_state.set_stride_z(stride_z);
+	}
 
+	void run(const BinaryState& init_state, const unsigned long iterations, const UpdateConfig uc) {
+		int it;
+		std::vector<state_index_t> update_indexes;
+
+		// Copy the content of the initial state. The strides are left untouched, they represent
+		// how the logging routines interpret the data. 
+		this->binary_state.copy_content(init_state);
+
+		notify_on_begin(this->binary_state, iterations);
+		for (it = 0; it < iterations; ++it) 
+		{
+				
+			binary_state.flip(it);
+			notify_state(std::tuple(it, binary_state.get(it)));
+			// Initially sample the updating indices
+			notify_energy(it*it * 0.1);
+			notify_order_parameter(it * 0.2);
+			notify_temperature(2.0 + it * 0.1);
+			// then we have to actuate the update.
+
+			// Finally we notify all loggers of changes.
+			// notify_order_parameter();
+			// notify_energy();
+			// notify_state();
+		}
+
+		notify_on_end(this->binary_state);
+
+		return;
 	}
 
 	// Now we list a few notify methods to be used in conjunction with
 	// the observers (the network loggers). Note that there may be
 	// multiple observer with different configurations!
 
-    void notify_state(const std::vector<double>& s) {
+    void notify_state(const std::vector<std::tuple<state_index_t, unsigned char>>& s) {
         for (auto* o : loggers) o->on_state_update(s);
     }
+
+	void notify_state(const std::tuple<state_index_t, unsigned char> change) {
+		for (auto* o : loggers) o->on_state_update(change);
+	}
 
     void notify_energy(double e) {
         for (auto* o : loggers) o->on_energy_update(e);
@@ -83,11 +129,22 @@ public:
         for (auto* o : loggers) o->on_order_parameter_update(m);
     }
 
+	void notify_on_end(const BinaryState& bs) {
+		for (auto* o : loggers) o->on_run_end(bs);
+	}
+
+	void notify_on_begin(const BinaryState& bs, unsigned int iterations) {
+		for (auto* o : loggers) {
+			o->on_run_begin(bs, iterations);
+		}
+	}
+
 };
 
 template <>
 void DenseHopfieldNetwork<HebbianPolicy>::store(BinaryState& bs) {
-
+	policy.store(bs);
 }
+
 
 #endif // !DENSE_HOPFIELD_NETWORK_HPP

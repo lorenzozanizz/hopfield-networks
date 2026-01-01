@@ -4,8 +4,10 @@
 
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
+#include <stack>
 #include <map>
 #include <memory>
 
@@ -24,7 +26,10 @@ namespace autograd {
         Inversion,
         Constant,
         Add,
+        Dot,
+        Transpose,
         Multiply,
+        Hadamard,
         Division,
 
         // _ Domain specific functions _ 
@@ -84,8 +89,16 @@ namespace autograd {
             dim = dimension;
         }
 
+        std::vector<ExpressionNode*>& get_children() {
+            return children;
+        }
+
         void set_expression_id(unsigned long expr_id) {
             expression_data.expr_id;
+        }
+
+        ExpressionType get_type() const {
+            return type;
         }
 
         dim_t dimension() const {
@@ -155,8 +168,25 @@ namespace autograd {
             return nodes.back().get();
         }
 
+        ExpressionNode* squared_norm(ExpressionNode* expr) {
+            return this->dot(expr, expr);
+        }
+
         void dealloc_all() {
             nodes.clear();
+        }
+
+        inline ExpressionNode* transpose(ExpressionNode* x) {
+            return nullptr;
+        }
+
+        inline ExpressionNode* dot(ExpressionNode* x, ExpressionNode* y) {
+            if (x->dimension() != y->dimension()) {
+                throw std::runtime_error("Cannot dot product expressions of different size");
+            }
+            auto* expr = create_vector_op(ExpressionType::Dot, { x, y });
+            expr->set_var_dimension(1);
+            return expr;
         }
 
         inline ExpressionNode* exponential(VectorVariable x) {
@@ -199,6 +229,7 @@ namespace autograd {
     class Differentiator {
 
         using NodeCache = std::unordered_map<ExpressionNode*, ExpressionNode*>;
+        using VectorVar = ExpressionNode*;
 
         // Keep a differentiation frame to avoid explicit recursion, compute the
         // derivative of a node when all of its required children are ready (either
@@ -214,24 +245,90 @@ namespace autograd {
         template <typename ScalarType>
         ExpressionNode* differentiate(
             ExpressionNode* root,
-            const dim_t var_index,
+            VectorVar variable,
             NodeGenerator& gen
         ) {
             NodeCache cache;
-            return differentiate(root, var_index, gen, cache);
+            return differentiate(root, variable, gen, cache);
         }
 
         ExpressionNode* differentiate(
-            ExpressionNode* node,
-            const dim_t var_index,
+            ExpressionNode* root,
+            VectorVar var,
             NodeGenerator& gen,
             NodeCache& cache
         ) {
-            const auto it = cache.find(node);
-            if (it != cache.end()) return it->second;
-           
+            std::stack<DiffFrame> st;
+            // No children yet, root is not ready yet
+            st.push({ root, {}, false });
+
+            while (!st.empty()) {
+                auto& frame = st.top();
+                ExpressionNode* node = frame.node;
+
+                // Cached?
+                if (cache.count(node)) {
+                    st.pop();
+                    continue;
+                }
+
+                if (no_children_derivative_required(node->get_type()))
+                    frame.ready = true;
+
+                if (!frame.ready) {
+                    frame.ready = true;
+
+                    // Push children
+                    for (auto* child : node->get_children()) {
+                        if (!cache.count(child)) {
+                            st.push({ child, {}, false });
+                        }
+                        else {
+                            frame.dchildren.push_back(cache[child]);
+                        }
+                    }
+                }
+                else {
+                    ExpressionNode* dnode = differentiate_node(node, frame.dchildren, var, gen);
+                    cache[node] = dnode;
+                    st.pop();
+                }
+            }
+
+            return cache[root];
+
+        }
+
+        ExpressionNode* differentiate_node(ExpressionNode* node, const std::vector<ExpressionNode*>& dchildren,
+            VectorVar var, NodeGenerator& gen) {
+
+            if (node->get_type() == ExpressionType::Variable) {
+                return gen.sum(dchildren[0], dchildren[1]);
+            }
+            else if (node->get_type() == ExpressionType::Dot) {
+                auto left_d = dchildren[0];
+                auto left = node->get_children()[0];
+                auto right_d = dchildren[1];
+                auto right = node->get_children()[1];
+
+                return gen.sum( gen.dot(left_d, right) , gen.dot(left, right_d) );
+            }
+            else if (node->get_type() == ExpressionType::Sigmoid) {
+
+            }
+            else if (node->get_type() == ExpressionType::Variable) {
+
+            }
             return nullptr;
         }
+
+        static constexpr bool no_children_derivative_required(ExpressionType type) {
+            if (type == ExpressionType::Variable || type == ExpressionType::Constant ||
+                type == ExpressionType::Sigmoid)
+                return true;
+            return false;
+        }
+
     };
 
 
@@ -247,22 +344,30 @@ namespace autograd {
     }
 
     template <typename ScalarType = float>
-    class Function {
+    class VectorFunction {
 
-        const dim_t vec_func_size;
+        using VectorExpression = ExpressionNode*;
+
+    };
+
+    template <typename ScalarType = float>
+    class ScalarFunction {
+
+        using VectorVar = ExpressionNode*;
+        using ScalarExpression = ExpressionNode*;
+        using VectorExpression = ExpressionNode*;
+
         // A node generator object is assigned to each function for thread
         // safety and to avoid memory leaks: when the function goes out of
         // scope, all its expression nodes are destroyed. Moreover this can
         // be used to share expression nodes among different expressions for
         // different function entries (
         NodeGenerator node_generator;
-        std::vector<ExpressionNode*> vec_function;
+        ScalarExpression root;
 
     public:
 
-        Function(
-            dim_t func_size
-        ) : vec_func_size(func_size), vec_function(func_size) { }
+        ScalarFunction() : root(nullptr) { }
 
         void operator() (const ScalarType* raw_data, ScalarType* result) {
             // See the notes  inside apply
@@ -275,13 +380,8 @@ namespace autograd {
             // any problem
         }
 
-        dim_t get_func_size() {
-            return vec_func_size;
-        }
-
         void flush_alloc_data() {
             node_generator.dealloc_all();
-            vec_function.clear();
         }
 
         // Return a reference to its owned generator. 
@@ -289,24 +389,65 @@ namespace autograd {
             return node_generator;
         }
 
-        void assign_all(ExpressionNode* expression) {
-            for (int i = 0; i < vec_func_size; ++i)
-                vec_function[i] = expression;
+        ScalarFunction& operator= (ScalarExpression expr) {
+            if (expr != nullptr && expr->dimension() != 1)
+                throw std::runtime_error("Cannot generate a scalar function from a vector expression!");
+            root = expr;
+            return *this;
         }
 
-        ExpressionNode*& operator[] (dim_t func_dim) {
-            return vec_function[func_dim];
+        ExpressionNode* expr() {
+            return root;
         }
 
-        ExpressionNode* component_expr(dim_t comp_index) {
-            return vec_function[comp_index];
+        void derivative(VectorFunction<ScalarType>& func, VectorVar var, unsigned int optimize_steps = 10) {
+            // Compute the derivative of this scalar function with respect to a variable
+            Differentiator diff;
+            VectorExpression expr = diff.differentiate( root, var, func.generator() );
+            // func = expr;
         }
 
-        void jacobian(const ScalarType* raw_input, ScalarType* output) {
-
-        }
-        
     };
+
+    std::string stringify_type(ExpressionType tp) {
+        switch (tp) {
+        case ExpressionType::Variable: return "Var";
+        case ExpressionType::Add: return "Sum";
+        case ExpressionType::Sigmoid: return "Sigmoid";
+        case ExpressionType::Dot: return "Dot";
+
+        }
+        return "Boh";
+    }
+
+    void printBT(const std::string& prefix, ExpressionNode* node, bool isLeft)
+    {
+        if (node != nullptr)
+        {
+            std::cout << prefix;
+
+            std::cout << (isLeft ? "|--" : "^--");
+            std::cout << stringify_type(node->get_type()) << "[" <<  node <<"]" << std::endl;
+
+            auto& children = node->get_children();
+            if (children.size() > 0)
+                printBT(prefix + (isLeft ? "|   " : "    "), children[0], true);
+            if (children.size() > 1)
+                printBT(prefix + (isLeft ? "|   " : "    "), children[1], false);
+        }
+    }
+
+    void printBT( ExpressionNode* node)
+    {
+        printBT("", node, false);
+    }
+
+    template <typename DataType>
+    std::ostream& operator<< (std::ostream& os, ScalarFunction< DataType>& sf) {
+        auto* root = sf.expr();
+        printBT(root);
+        return os;
+    }
 
 } // ! namespace autograd
 

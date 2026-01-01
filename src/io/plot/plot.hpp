@@ -6,6 +6,7 @@
 #include <string>
 #include <chrono>
 #include <thread>
+#include <stdexcept>
 
 #include <tuple>
 
@@ -60,46 +61,93 @@ public:
 		// Receive a pipeline from the external plotter object
 		PlottingContext(GnuplotPipe& p): pipe(p) { }
 
-		void redirect_to_image(const std::string& file_name) {
-			// set output "plot.png"
+		PlottingContext& redirect_to_image(const std::string& file_name) {
+			pipe.send_line("set output '" + file_name + "'; set term png;");
+			return *this;
 		}
 
-		void begin_multi_line_plot() {
-
+		PlottingContext& begin_multi_line_plot() {
+			return *this;
 		}
 
-		void plot_2d() {
-
+		PlottingContext& set_title(const std::string& plot_title) {
+			pipe.send_line("set title '" + plot_title + "'");
+			return *this;
 		}
 
-		void show_image(const Image& image) {
-			// NOTE: This is not thread safe! ensure that plotting happens on a single
-			// master thread at all times. 
-			const unsigned char* buffer = image.view();
+		PlottingContext& set_x_label(const std::string& label) {
+			pipe.send_line("set xlabel '" + label + "'");
+			return *this;
+		}
+
+		PlottingContext& set_y_label(const std::string& label) {
+			pipe.send_line("set ylabel '" + label + "'");
+			return *this;
+		}
+
+		template <typename XType, typename YType>
+		PlottingContext& plot_2d(const std::vector<std::tuple<XType, YType>>& xs) {
+			const auto size = xs.size();
+			pipe.send_line("plot '-' using 1:2 with lines");
+			for (int i = 0; i < size; ++i) {
+				auto& pair = xs[i];
+				pipe.send_line(std::to_string(std::get<0>(pair)) + " " + std::to_string(std::get<1>(pair)));
+			}
+			pipe.send_line("e");
+			return *this;
+		}
+
+		template <typename XType, typename YType>
+		PlottingContext& plot_2d(const std::vector<XType>& xs, const std::vector<YType>& ys) {
+			if (xs.size() != ys.size()) {
+				throw std::runtime_error("Cannot plot mismatch dimensions: x,y ->" +
+					std::to_string(xs.size()) + ", " + std::to_string(ys.size()));
+			}
+			const auto size = xs.size();
+			pipe.send_line("plot '-' using 1:2 with lines");
+			for (int i = 0; i < size; ++i) {
+				pipe.send_line(std::to_string(xs[i]) + " " + std::to_string(ys[i]));
+			}
+			pipe.send_line("e");
+			return *this;
+		}
+
+		template <typename YType>
+		PlottingContext& plot_sequence(const std::vector<YType>& ys) {
+			pipe.send_line("plot '-' using 0:1 with lines");
+			for (int i = 0; i < ys.size(); ++i)
+				pipe.send_line(std::to_string(ys[i]));
+			pipe.send_line("e");
+			return *this;
+		}
+
+		PlottingContext& write_image(const std::string& path, unsigned char* data, int width, int height, int channels) {
+			this->redirect_to_image(path);
+			this->show_image(data, width, height, channels);
+			return *this;
+		}
+
+		PlottingContext& show_image(const unsigned char* buffer, int width, int height, int channels) {
+
 			pipe.send_line("set yrange [*:*] reverse");
-			if (image.channels == 1) {
+			if (channels == 1) {
 				// We simply handle a greyscale image writing an intermediate and using
 				// gnuplot map view.
-				std::ofstream out(Plotter::temp_file);
-				for (int y = 0; y < image.height; y++) {
-					for (int x = 0; x < image.width; x++) {
-						out << (int)buffer[y * image.width + x] << " ";
-					} out << "\n";
-				} out.close();
-				// pipe.send_line("set view map");
-				// pipe.send_line("plot 'gnuplot_temp.dat' matrix with image");
-
 				auto raw_pipe = pipe.raw();
-				fprintf(raw_pipe, "plot '-' binary array=(%d,%d) format='%%uchar' with image\n", image.width, image.height);
-				fwrite(buffer, 1, image.width * image.height, raw_pipe);
+				fprintf(raw_pipe, "plot '-' binary array=(%d,%d) format='%%uchar' with image\n", width, height);
+				fwrite(buffer, 1, width * height, raw_pipe);
 			}
 			else {
 
 			}
-
+			return *this;
 		}
 
-		void show_binary_image(unsigned char *data, int width, int height) {
+		PlottingContext& show_image(const Image& image) {
+			return this->show_image(image.view(), image.width, image.height, image.channels);
+		}
+
+		PlottingContext& show_binary_image(unsigned char *data, int width, int height) {
 			auto raw_pipe = pipe.raw();
 			pipe.send_line("set yrange [*:*] reverse");
 			fprintf(raw_pipe, "plot '-' binary array=(%d,%d) format='%%uchar' with image\n", width, height);
@@ -112,6 +160,7 @@ public:
 				if (bit_value) fprintf(raw_pipe, "%c", 255);
 				else fprintf(raw_pipe, "%c", 0);
 			}
+			return *this;
 		}
 
 		~PlottingContext() { }
@@ -142,9 +191,12 @@ public:
 		// First we ensure that gnuplot has really flushed all our data:
 		pipe.flush_send_end_of_data(0);
 		std::string v;
+		std::cout << "\x1b[0;33m" << 
+			"\n> ( PLOTTER NOTE ) Call to Plotter.block() issued: to continue, write 'continue' or 'clear' to close plots." << 
+			"\x1b[0m" << std::endl;
 		do {
 			std::cin >> v;
-			// Disallow spin locking...
+			// Make spin locking a bit loose...
 			std::this_thread::sleep_for(std::chrono::milliseconds(300));
 		} while (!(v == "continue") && !(v == "clear"));
 	}

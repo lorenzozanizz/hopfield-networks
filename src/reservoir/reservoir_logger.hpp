@@ -4,6 +4,10 @@
 
 class ReservoirLogger {
 
+	on_state_change() {
+
+	}
+
 };
 
 #endif
