@@ -33,6 +33,17 @@ public:
   
     std::size_t nonZeroCount() { return this->data.size(); }
 
+    friend std::ostream& operator<<(std::ostream& os, const SparseVector& vec) {
+        os << "SparseVector (" << vec.dim << ")\n";
+
+        for (const auto& [idx, value] : vec.data) {
+            
+            os << "(" << idx << ") = " << value << "\n";
+        }
+
+        return os;
+    }
+
     SparseVector operator*(const double x) {
 
         SparseVector result(this->size());
