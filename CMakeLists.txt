@@ -31,3 +31,6 @@ else()
     message(STATUS "Gnuplot not found")
 endif()
 
+find_package(Eigen3 REQUIRED) 
+target_link_libraries(main PRIVATE Eigen3::Eigen)
+

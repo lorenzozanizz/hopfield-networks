@@ -21,10 +21,14 @@ namespace autograd {
     // its own derivative
     enum class ExpressionType {
 
-        // _ Basic math operations _
+        // _ Constants _
         Variable,
-        Inversion,
         Constant,
+        Zero,
+        Identity,
+
+        // _ Functions _
+        Inversion,
         Add,
         Dot,
         Transpose,
@@ -36,13 +40,10 @@ namespace autograd {
         Exponentiation,
         Sigmoid,
         Relu,
-        Selector,
+        Selector, // Somewhat corny but equal to a hadamard product with a constant binary mask
         // Summation of a vector variable excluding an index
-        ExclusiveSummation,
-        // Summation of a vector variable including the index
-        InclusiveSummation,
+        Summation,
 
-        ScalarFunc,
         // Reserved for future (?) use
         Custom
 
@@ -101,6 +102,14 @@ namespace autograd {
             return type;
         }
 
+        bool is_zero() const {
+            return type == ExpressionType::Zero;
+        }
+
+        bool is_identity() const {
+            return type == ExpressionType::Identity;
+        }
+
         dim_t dimension() const {
             return dim;
         }
@@ -141,7 +150,7 @@ namespace autograd {
         }
 
         ExpressionNode* create_vector_op(ExpressionType type,
-            const std::vector<ExpressionNode*>& children) {
+            const std::vector<ExpressionNode*>& children, unsigned int dimension) {
 
             nodes.emplace_back(
                 std::make_unique<ExpressionNode>(type)
@@ -149,13 +158,31 @@ namespace autograd {
             // Handle the case where no children may be present
             if (children.size()) {
                 nodes.back()->children = children;
-                nodes.back()->set_var_dimension(children[0]->dimension());
             }
+            nodes.back()->set_var_dimension(dimension);
+            return nodes.back().get();
+        }
+
+        ExpressionNode* identity(unsigned int dimension) {
+            nodes.emplace_back(
+                std::make_unique<ExpressionNode>(ExpressionType::Identity)
+            );
+            auto* ret = nodes.back().get();
+            ret->set_var_dimension(dimension);
+            return nodes.back().get();
+        }
+
+        ExpressionNode* zero(unsigned int dimension) {
+            nodes.emplace_back(
+                std::make_unique<ExpressionNode>(ExpressionType::Zero)
+            );
+            auto* ret = nodes.back().get();
+            ret->set_var_dimension(dimension);
             return nodes.back().get();
         }
 
         ExpressionNode* create_vector_op(ExpressionType type,
-            const std::initializer_list<ExpressionNode*> children) {
+            const std::initializer_list<ExpressionNode*> children, unsigned int dimension) {
             // Overload to allow more comfortable initializer list expressions
             nodes.emplace_back(
                 std::make_unique<ExpressionNode>(type)
@@ -163,8 +190,8 @@ namespace autograd {
             // Handle the case where no children may be present
             if (children.size()) {
                 nodes.back()->children = children;
-                nodes.back()->set_var_dimension((*children.begin())->dimension());
             }
+            nodes.back()->set_var_dimension(dimension);
             return nodes.back().get();
         }
 
@@ -184,44 +211,44 @@ namespace autograd {
             if (x->dimension() != y->dimension()) {
                 throw std::runtime_error("Cannot dot product expressions of different size");
             }
-            auto* expr = create_vector_op(ExpressionType::Dot, { x, y });
-            expr->set_var_dimension(1);
+            auto* expr = create_vector_op(ExpressionType::Dot, { x, y }, 1);
             return expr;
         }
 
         inline ExpressionNode* exponential(VectorVariable x) {
-            return create_vector_op(ExpressionType::Exponentiation, { x });
+            return create_vector_op(ExpressionType::Exponentiation, { x }, x->dimension());
         }
 
         inline ExpressionNode* sigmoid(VectorVariable x) {
-            return create_vector_op(ExpressionType::Sigmoid, { x });
+            return create_vector_op(ExpressionType::Sigmoid, { x }, x->dimension());
         }
 
         inline ExpressionNode* relu(VectorVariable x) {
-            return create_vector_op(ExpressionType::Relu, { x });
+            return create_vector_op(ExpressionType::Relu, { x }, x->dimension());
         }
 
-        inline ExpressionNode* inverse(ExpressionNode* a) {
-            return create_vector_op(ExpressionType::Inversion, { a });
+        inline ExpressionNode* inverse(ExpressionNode* x) {
+            return create_vector_op(ExpressionType::Inversion, { x }, x->dimension());
         }
 
         inline ExpressionNode* sum(ExpressionNode* a, ExpressionNode* b) {
-            return create_vector_op(ExpressionType::Add, { a, b });
+            if (a->dimension() != b->dimension())
+                throw std::runtime_error("Cannot sum elements of different size");
+            return create_vector_op(ExpressionType::Add, { a, b }, a->dimension());
         }
 
         inline ExpressionNode* sum(ExpressionNode* a, float v) {
             // Create a virtual constant from the value v e.g. create
             // a constant vector (just 1 float is stored, not O(n))
             const auto b = create_vector_constant(a->dimension(), v);
-            return create_vector_op(ExpressionType::Add, { a, b });
+            return create_vector_op(ExpressionType::Add, { a, b }, a->dimension());
         }
 
         inline ExpressionNode* prod(ExpressionNode* a, ExpressionNode* b) {
-            return create_vector_op(ExpressionType::Multiply, { a, b });
-        }
-
-        inline ExpressionNode* matmul(ExpressionNode* a) {
-            return create_vector_op(ExpressionType::Multiply, { a });
+            // Elementwise product!
+            if (a->dimension() != b->dimension())
+                throw std::runtime_error("Cannot perform hadamard of different size");
+            return create_vector_op(ExpressionType::Hadamard, { a, b }, a->dimension());
         }
 
     };
@@ -317,14 +344,16 @@ namespace autograd {
 
             }
             else if (node->get_type() == ExpressionType::Variable) {
-
+                if (node == var)
+                    return gen.identity(node->dimension());
+                else return gen.zero(node->dimension());
             }
             return nullptr;
         }
 
         static constexpr bool no_children_derivative_required(ExpressionType type) {
             if (type == ExpressionType::Variable || type == ExpressionType::Constant ||
-                type == ExpressionType::Sigmoid)
+                type == ExpressionType::Sigmoid || type == ExpressionType::Identity)
                 return true;
             return false;
         }
@@ -342,6 +371,102 @@ namespace autograd {
         // Register the custom operation on a static private registry
         // operation_registry.insert(op_id, par_der);
     }
+
+    template <typename ScalarType>
+    using EvalCache = std::unordered_map<ExpressionNode*, std::vector<ScalarType>>;
+
+    template <typename ScalarType>
+    using EvalMap = std::map<ExpressionNode*, ScalarType*>;
+
+    // Forward declaration
+    template <typename ScalarType>
+    std::vector<ScalarType> eval_node(
+        ExpressionNode* node,
+        const EvalMap<ScalarType>& eval_data,
+        EvalCache<ScalarType>& cache
+    );
+
+    template <typename ScalarType>
+    std::vector<ScalarType> eval_variable(
+        ExpressionNode* node,
+        const EvalMap<ScalarType>& eval_data
+    ) {
+        // This constructs a vector to be moved using the reference data
+        // in the evaluation data mapping. somewhat memory inefficient,
+        // realistically not that much when using memoization explicitly.
+
+        auto it = eval_data.find(node);
+        if (it == eval_data.end()) {
+            throw std::runtime_error("Missing value for variable node in eval_data");
+        }
+        ScalarType* buf = it->second;
+        const auto dim = node->dimension();
+        return std::vector<ScalarType>(buf, buf + dim);
+    }
+
+    template <typename ScalarType>
+    // NOTE: we make EXTENSIVE use of compilers RVO return value optimization,
+    // this vector is in practice always constructed in the returnee's memory.
+    std::vector<ScalarType> eval_node(
+        ExpressionNode* node,
+        const EvalMap<ScalarType>& eval_data,
+        EvalCache<ScalarType>& cache
+    ) {
+        // Check cache first
+        auto it_cache = cache.find(node);
+        if (it_cache != cache.end()) {
+            return it_cache->second;
+        }
+
+        std::vector<ScalarType> result;
+        const auto dim = node->dimension();
+        const auto& children = node->get_children();
+
+        switch (node->get_type()) {
+
+        case ExpressionType::Variable: {
+            // Simply take the memory stored in eval data and copy it into the vector.
+            result = eval_variable<ScalarType>(node, eval_data);
+            break;
+        }
+
+        case ExpressionType::Constant: {
+            // Analyze the size of the constant and create a vector of that size.
+            result.assign(dim, 
+                // This cast handles every reasonable scalar int, float, ...
+                static_cast<ScalarType>(node->expression_data.vector_constant));
+            break;
+        }
+
+        case ExpressionType::Zero: {
+            // This may seem inefficient, but reasonably the computation trees are 
+            // made efficient enough that this is never required.
+            result.assign(dim, static_cast<ScalarType>(0));
+            break;
+        }
+
+        case ExpressionType::Add: {
+            if (children.size() != 2) {
+                throw std::runtime_error("Add expects 2 children");
+            }
+            auto a = eval_node<ScalarType>(children[0], eval_data, cache);
+            auto b = eval_node<ScalarType>(children[1], eval_data, cache);
+            result.resize(dim);
+            for (dim_t i = 0; i < dim; ++i) {
+                result[i] = a[i] + b[i];
+            }
+            break;
+        }
+                                        // For now, we can skip Identity, Selector, Summation, etc. or throw:
+        default:
+            throw std::runtime_error("Evaluation not implemented for this ExpressionType");
+        }
+
+        // Cache and return
+        cache[node] = result;
+        return result;
+    }
+
 
     template <typename ScalarType = float>
     class VectorFunction {
@@ -369,15 +494,29 @@ namespace autograd {
 
         ScalarFunction() : root(nullptr) { }
 
-        void operator() (const ScalarType* raw_data, ScalarType* result) {
+        double operator() (const std::map<VectorVar, ScalarType*>& eval_data) {
             // See the notes  inside apply
-            apply(raw_data, result);
+            return apply(eval_data);
         }
 
-        void apply(ScalarType* raw_data, ScalarType* result) {
-            // Assume complete data and output indipendence, so that
-            // processing for each vector entry can happen in paralell without
-            // any problem
+        double apply(const std::map<VectorVar, ScalarType*>& eval_data) {
+            if (root == nullptr) { 
+                throw std::runtime_error("ScalarFunction has no root expression"); 
+            } 
+            if (root->dimension() != 1) { 
+                throw std::runtime_error("ScalarFunction root must have dimension 1"); 
+            } 
+            // Note: WE CANNOT ASSUME no-aliasing of the data vectors because the expression tree is 
+            // really an expression DAG because of memoization!
+            // We cache intermediate portions of the graphs to avoid repeated computation of 
+            // certain values.
+            EvalCache<ScalarType> cache; 
+            
+            auto vec_result = eval_node<ScalarType>(root, eval_data, cache); 
+            if (vec_result.size() != 1) { 
+                throw std::runtime_error("Root evaluation did not produce a scalar, this is abnormal for a scalar function"); 
+            }
+            return vec_result[0];
         }
 
         void flush_alloc_data() {
@@ -417,11 +556,10 @@ namespace autograd {
         case ExpressionType::Dot: return "Dot";
 
         }
-        return "Boh";
+        return "N/a";
     }
 
-    void printBT(const std::string& prefix, ExpressionNode* node, bool isLeft)
-    {
+    void print_as_binary_tree(const std::string& prefix, ExpressionNode* node, bool isLeft) {
         if (node != nullptr)
         {
             std::cout << prefix;
@@ -431,21 +569,20 @@ namespace autograd {
 
             auto& children = node->get_children();
             if (children.size() > 0)
-                printBT(prefix + (isLeft ? "|   " : "    "), children[0], true);
+                print_as_binary_tree(prefix + (isLeft ? "|   " : "    "), children[0], true);
             if (children.size() > 1)
-                printBT(prefix + (isLeft ? "|   " : "    "), children[1], false);
+                print_as_binary_tree(prefix + (isLeft ? "|   " : "    "), children[1], false);
         }
     }
 
-    void printBT( ExpressionNode* node)
-    {
-        printBT("", node, false);
+    void print_as_binary_tree( ExpressionNode* node) {
+        print_as_binary_tree("", node, false);
     }
 
     template <typename DataType>
     std::ostream& operator<< (std::ostream& os, ScalarFunction< DataType>& sf) {
         auto* root = sf.expr();
-        printBT(root);
+        print_as_binary_tree(root);
         return os;
     }
 

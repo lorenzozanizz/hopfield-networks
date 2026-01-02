@@ -43,6 +43,7 @@ autograd_compile() {
 	const auto expr = g.squared_norm(g.sigmoid(g.sum(u, 1.0)));
 	func = expr;
 
+	func()
 	std::cout << func;
 }
 
@@ -73,7 +74,7 @@ hopfield_compile() {
 	dhn.store(bs1);
 
 	StateUtils::load_state_from_image(bs2, img2, /* binarize */ true);
-	dhn.store(bs2);
+
 
 	StateUtils::load_state_from_image(bs3, img3, /* binarize */ true);
 	dhn.store(bs3);
@@ -99,7 +100,7 @@ hopfield_compile() {
 	StateUtils::plot_state(p, bs1);
 
 	UpdateConfig uc = {
-		UpdatePolicy::OnlineUpdate
+		UpdatePolicy::Asynchronous
 	};
 
 
@@ -108,8 +109,13 @@ hopfield_compile() {
 	dhn.run(bs1, 20, uc);
 	dhn.detach_logger(&logger);
 
-	CrossTalkTermVisualizer cttv(bs3, { &bs2, &bs1 });
-	cttv.show();
+	HebbianCrossTalkTermVisualizer cttv(p, 40*40);
+	std::cout << "Devo calcola" << std::endl;
+
+	cttv.compute_cross_talk_view(bs1, { &bs2, &bs3 });
+	std::cout << "Devo showa" << std::endl;
+	cttv.show(40, 40);
+
 
 	p.block();
 }

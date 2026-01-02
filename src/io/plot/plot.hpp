@@ -59,7 +59,10 @@ public:
 	public:
 
 		// Receive a pipeline from the external plotter object
-		PlottingContext(GnuplotPipe& p): pipe(p) { }
+		PlottingContext(GnuplotPipe& p): pipe(p) { 
+			// Reset all the previous context (titles, flipping ys, ...)
+			pipe.send_line("reset");
+		}
 
 		PlottingContext& redirect_to_image(const std::string& file_name) {
 			pipe.send_line("set output '" + file_name + "'; set term png;");
@@ -140,6 +143,34 @@ public:
 			else {
 
 			}
+			return *this;
+		}
+
+		PlottingContext& show_heatmap(const float* buffer, int width, int height) {
+
+			pipe.send_line("set yrange [*:*] reverse");
+			pipe.send_line("unset key");
+			pipe.send_line("set view map");
+			pipe.send_line("set palette rgbformula -7,2,-7");
+
+			auto raw_pipe = pipe.raw();
+			pipe.send_line("splot '-' matrix with image");
+			for (int i = 0; i < width; ++i) {
+				for (int j = 0; j < width; ++j)
+					fprintf(raw_pipe, "%f ", buffer[i * width + j]);
+				fprintf(raw_pipe, "\n");
+			}
+			pipe.send_line("e");
+			return *this;
+		}
+
+		PlottingContext& set_cblabel(const std::string& val) {
+			pipe.send_line("set cblabel '" + val + "'");
+			return *this;
+		}
+
+		PlottingContext& unset_cb_ticks(const std::string& val) {
+			pipe.send_line("unset cbtics");
 			return *this;
 		}
 

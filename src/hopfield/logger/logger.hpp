@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <algorithm>
 #include <string>
 #include <cstdint>
 #include <tuple>
@@ -57,6 +58,8 @@ protected:
     NamedVectorCollection<float> nvc;
     Plotter* plotter;
 
+    std::vector<Event> interested_in;
+
     // Flags which memorize which values need to be saved for
     // the logger
     bool record_states;
@@ -74,11 +77,15 @@ public:
 
     HopfieldLogger(Plotter* plot) : write_buffer(10), plotter(plot), record_states(false), record_energy(false),
         record_temperature(false), record_order(false), f_out(nullptr), close_after(false)
-    { }
+    {
+        interested_in.clear();
+    }
 
     HopfieldLogger() : write_buffer(10), record_states(false), record_energy(false),
         record_temperature(false), record_order(false), f_out(nullptr), close_after(false)
-    { }
+    {
+        interested_in.clear();
+    }
 
     void set_plotter(Plotter* plot) {
         plotter = plot;
@@ -94,13 +101,31 @@ public:
     void set_collect_states(bool v, const std::string& into = "states.gif") { 
         record_states = v; 
         states_gif_save = into;
+        if (v)
+            interested_in.push_back(Event::StateChanged);
     }
     
-    void set_collect_energy(bool v) { record_energy = v; }
+    void set_collect_energy(bool v) { 
+        record_energy = v;
+        if (v)
+            interested_in.push_back(Event::EnergyChanged);
+    }
     
-    void set_collect_temperature(bool v) { record_temperature = v; }
+    void set_collect_temperature(bool v) {
+        record_temperature = v; 
+        if (v)
+            interested_in.push_back(Event::TemperatureChanged);
+    }
 
-    void set_collect_order_parameter(bool v) { record_order = v; }
+    void set_collect_order_parameter(bool v) {
+        record_order = v; 
+        if (v)
+            interested_in.push_back(Event::OrderParameterChanged);
+    }
+
+    bool is_interested_in(const Event evt) {
+        return std::find(interested_in.begin(), interested_in.end(), evt) != interested_in.end();
+    }
 
     void finally_plot_data(bool val) {
         finally_plot = true;

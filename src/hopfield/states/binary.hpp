@@ -167,6 +167,10 @@ public:
 	inline long get(state_index_t bit_index) const {
 		return raw_data[bit_index >> 3] & mask_for(bit_index % 8);
 	}
+
+	inline bool high(state_index_t bit_index) const {
+		return (raw_data[bit_index >> 3] & mask_for(bit_index % 8)) != 0;
+	}
 		
 	class BinaryStateIterator {
 
