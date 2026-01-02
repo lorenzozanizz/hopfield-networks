@@ -74,6 +74,21 @@ public:
 			binary_state.set_stride_z(stride_z);
 	}
 
+	enum class ComputeQuantity {
+		Temperature,
+		OrderParameter,
+		Energy
+	};
+
+	class ComputationSchedule {
+
+	};
+
+	ComputationSchedule fix_computation_schedule() {
+
+		return ComputationSchedule();
+	}
+
 	void run(const BinaryState& init_state, const unsigned long iterations, const UpdateConfig uc) {
 		int it;
 		std::vector<state_index_t> update_indexes;
@@ -82,6 +97,7 @@ public:
 		// how the logging routines interpret the data. 
 		this->binary_state.copy_content(init_state);
 
+		auto schedule = fix_computation_schedule();
 		notify_on_begin(this->binary_state, iterations);
 		for (it = 0; it < iterations; ++it) 
 		{
