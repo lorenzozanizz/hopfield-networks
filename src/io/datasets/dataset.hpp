@@ -7,6 +7,7 @@
 
 
 template <typename DataType, typename YType>
+
 class Dataset {
 
 private:
@@ -17,21 +18,16 @@ private:
 public:
     using index_t = std::size_t;
 
-    Dataset(size_t input_size)
-        : input_size(input_size) {}
+    Dataset(size_t input_size) : input_size(input_size) {}
 
     void add_sample(const DataType* x, YType label) {
         auto ptr = std::make_unique<DataType[]>(input_size);
-        for (size_t i = 0; i < input_size; ++i)
-            ptr[i] = x[i];
-
+        std::copy(x, x + input_size, ptr.get());
         x_data.push_back(std::move(ptr));
         y_data.push_back(label);
     }
 
-    index_t size() const {
-        return x_data.size();
-    }
+    index_t size() const { return x_data.size(); }
 
     const std::unique_ptr<DataType[]>& x_of(index_t i) const {
         return x_data.at(i);
@@ -41,6 +37,7 @@ public:
         return y_data.at(i);
     }
 };
+
 
 
 #endif

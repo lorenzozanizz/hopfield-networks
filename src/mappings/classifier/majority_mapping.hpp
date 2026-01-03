@@ -17,7 +17,7 @@ class MajorityMapping {
 
 private:
 
-	KonohenMap<DataType> trained_map;
+	KonohenMap<DataType>& trained_map;
 	double threshold; // the percentage of hits required to label a neuron
 	std::map<int, std::string>  labels_map; // this maps a label idx to its label
 	std::map<int, std::vector<int>> hits_map; // this maps a neuron idx to a vector that keeps track of how many times each label hits that neuron
@@ -48,7 +48,7 @@ public:
 	}
 
 	// Pass a labeled set of data in order to classify the neurons of the trained map
-	void classify(const Dataset<std::unique_ptr<DataType[]>, int>& dataset) {
+	void classify(const Dataset<DataType, int>& dataset){
 
 		for (size_t i = 0; i < dataset.size(); ++i) {
 
