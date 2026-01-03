@@ -9,25 +9,15 @@
 template <typename XType, typename YType>
 class Dataset {
 
-	using index_t = unsigned long long;
-
 public:
 
-	index_t size() {
+    using index_t = std::size_t;
 
-	}
+    virtual index_t size() const = 0;
+    virtual const XType& x_of(index_t index) const = 0;
+    virtual const YType& y_of(index_t index) const = 0;
 
-	YType& y_of(index_t index) const {
-
-	}
-
-	XType& x_of(index_t index) const {
-
-	}
-
-	std::tuple<XTuple, YTuple>& const {
-
-	}
+    virtual ~Dataset() = default;
 
 };
 
