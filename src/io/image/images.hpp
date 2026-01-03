@@ -101,19 +101,19 @@ public:
 	}
 
 	static void write_jpg(const char* file_name, unsigned char* raw_data, unsigned int width,
-		unsigned int height, const Channels ch) {
+		unsigned int height, const Channels ch, unsigned int quality = 100) {
 		if (ch == Channels::RGBA)
 			throw std::runtime_error("Cannot write a jpg with a transparency channel.");
 		else if (!raw_data)
 			throw std::runtime_error("Cannot write a null image.");
 		stbi_write_jpg(file_name, width, height, static_cast<unsigned int>(ch), raw_data,
 			/* compression_quality! */
-			100);
+			quality);
 	}
  
 	static void write_jpg(const std::string& file_name, unsigned char* raw_data, unsigned int width,
-		unsigned int height, const Channels ch) {
-		write_jpg(file_name.data(), raw_data, width, height, ch);
+		unsigned int height, const Channels ch, unsigned int quality = 100) {
+		write_jpg(file_name.data(), raw_data, width, height, ch, quality);
 	}
 };
 

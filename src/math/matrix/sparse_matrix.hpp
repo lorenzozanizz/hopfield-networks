@@ -129,9 +129,6 @@ public:
         return result;
     }
 
-    
-   
-
     double product_row_vector(size_t row, const SparseVector& other) {
         if (this->cols != other.size()) {
             throw std::invalid_argument("Matrix size mismatch");
@@ -153,9 +150,6 @@ public:
 
         return result;
     }
-
-
-    
 
     double product_row_vector(size_t row, const std::vector<double>& other) {
 

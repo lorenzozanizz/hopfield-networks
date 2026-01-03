@@ -6,8 +6,11 @@
 
 namespace MathOps {
 
-	float spectral_radius() {
+	float max_eigenvalue() {
+		// Compute the maximum eigenvalue = spectral radius with the
+		// power method. 
 
+		return 0.0; 
 	}
 
 }

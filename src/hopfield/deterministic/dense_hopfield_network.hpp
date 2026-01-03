@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <functional>
 #include <iostream>
 
 #include "../../io/plot/plot.hpp"
@@ -13,8 +14,10 @@
 #include "../weighting/weighting_base.hpp"
 
 enum class UpdatePolicy {
-	BatchUpdate,
-	OnlineUpdate,
+	// Flip every unit together
+	Synchronous,
+	// Flip a unit at a time.
+	Asynchronous,
 	GroupUpdate
 };
 
@@ -32,18 +35,25 @@ struct UpdateConfig {
 template <typename WeightingPolicy>
 class DenseHopfieldNetwork {
 
+protected:
+
 	// The weighing policy determines how network weights are 
 	// compute and stored
 	WeightingPolicy policy;
 
 	BinaryState binary_state;
+	double current_energy;
 	std::vector<HopfieldLogger*> loggers;
+
+	// To be used when keeping track of order parameter
+	std::vector<std::reference_wrapper<BinaryState>> ref_state;
 
 public:
 
 	DenseHopfieldNetwork(state_size_t size) : policy(size), binary_state(size) {
 		// By interface allow policies to have lazy allocation
 		policy.allocate();
+		current_energy = 0;
 	}
 
 	void detach_logger(HopfieldLogger* logger) {
@@ -65,8 +75,9 @@ public:
 		return binary_state;
 	}
 
-	// This ...
-	void store(BinaryState& bs);
+	void store(BinaryState& bs) {
+		policy.store(bs);
+	}
 
 	void set_state_strides(unsigned int stride_y, unsigned int stride_z = 0) {
 		binary_state.set_stride_y(stride_y);
@@ -74,22 +85,36 @@ public:
 			binary_state.set_stride_z(stride_z);
 	}
 
-	enum class ComputeQuantity {
-		Temperature,
-		OrderParameter,
-		Energy
-	};
+	void set_reference_state(BinaryState& bs) {
 
-	class ComputationSchedule {
-
-	};
-
-	ComputationSchedule fix_computation_schedule() {
-
-		return ComputationSchedule();
 	}
 
-	void run(const BinaryState& init_state, const unsigned long iterations, const UpdateConfig uc) {
+	// Use this to avoid computation of quantities which are not required
+	// during the execution
+	struct ComputationSchedule {
+		bool do_energy;
+		bool do_temperature;
+		bool do_order_parameter;
+	};
+
+	// See comment above ^
+	ComputationSchedule fix_computation_schedule() {
+		ComputationSchedule sched;
+		for (auto* o : loggers) {
+			if (o->is_interested_in(Event::EnergyChanged))
+				sched.do_energy = true;
+			if (o->is_interested_in(Event::OrderParameterChanged))
+				sched.do_temperature = true;
+			if (o->is_interested_in(Event::TemperatureChanged))
+				sched.do_order_parameter = true;
+		}
+		return sched;
+	}
+
+	void run(const BinaryState& init_state,
+		const unsigned long iterations,
+		const UpdateConfig uc // Describe whether we have asyncronous, synchronous or group updates.
+	) {
 		int it;
 		std::vector<state_index_t> update_indexes;
 
@@ -102,7 +127,6 @@ public:
 		for (it = 0; it < iterations; ++it) 
 		{
 				
-			binary_state.flip(it);
 			notify_state(std::tuple(it, binary_state.get(it)));
 			// Initially sample the updating indices
 			notify_energy(it*it * 0.1);
@@ -110,15 +134,26 @@ public:
 			notify_temperature(2.0 + it * 0.1);
 			// then we have to actuate the update.
 
+
+
 			// Finally we notify all loggers of changes.
 			// notify_order_parameter();
 			// notify_energy();
 			// notify_state();
+
+			// This internally calls notify_energy()
+			if (schedule.do_energy)
+				compute_energy();
 		}
 
 		notify_on_end(this->binary_state);
 
 		return;
+	}
+
+	void compute_energy() {
+		current_energy = 1;
+		notify_energy(current_energy);
 	}
 
 	// Now we list a few notify methods to be used in conjunction with
@@ -157,10 +192,6 @@ public:
 
 };
 
-template <>
-void DenseHopfieldNetwork<HebbianPolicy>::store(BinaryState& bs) {
-	policy.store(bs);
-}
 
 
 #endif // !DENSE_HOPFIELD_NETWORK_HPP

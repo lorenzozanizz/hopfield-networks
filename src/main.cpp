@@ -49,6 +49,7 @@ autograd_compile() {
 	const auto expr = g.squared_norm(g.sigmoid(g.sum(u, 1.0)));
 	func = expr;
 
+	func()
 	std::cout << func;
 	
 	
@@ -70,7 +71,7 @@ hopfield_compile() {
 	{ p.context().show_image(img1_r); }
 
 
-	StateUtils::load_state_from_image(bs1, img1_r,  true);
+	StateUtils::load_state_from_image(bs1, img1_r,  /* binarize */ true);
 
 	{ p.context().show_image(img1_r); }
 
@@ -80,10 +81,10 @@ hopfield_compile() {
 	std::cout << "Loaded image!" << std::endl;
 	dhn.store(bs1);
 
-	StateUtils::load_state_from_image(bs2, img2,    true);
-	dhn.store(bs2);
+	StateUtils::load_state_from_image(bs2, img2, /* binarize */ true);
+	
 
-	StateUtils::load_state_from_image(bs3, img3,  true);
+	StateUtils::load_state_from_image(bs3, img3, /* binarize */ true);
 	dhn.store(bs3);
 
 	auto& weighting_policy = dhn.weighting_policy();
@@ -102,12 +103,12 @@ hopfield_compile() {
 	logger.finally_write_last_state_png(true, "last_state.png");
 	logger.finally_plot_data(true);
 
-	StateUtils::perturb_state(bs1,  0.15);
+	StateUtils::perturb_state(bs1,  /* Noise intensity 0 to 1*/ 0.15);
 	std::cout << "Plotting state!" << std::endl;
 	StateUtils::plot_state(p, bs1);
 
 	UpdateConfig uc = {
-		UpdatePolicy::OnlineUpdate
+		UpdatePolicy::Asynchronous
 	};
 
 
@@ -116,8 +117,13 @@ hopfield_compile() {
 	dhn.run(bs1, 20, uc);
 	dhn.detach_logger(&logger);
 
-	CrossTalkTermVisualizer cttv(bs3, { &bs2, &bs1 });
-	cttv.show();
+	HebbianCrossTalkTermVisualizer cttv(p, 40*40);
+	std::cout << "Devo calcola" << std::endl;
+
+	cttv.compute_cross_talk_view(bs1, { &bs2, &bs3 });
+	std::cout << "Devo showa" << std::endl;
+	cttv.show(40, 40);
+
 
 	p.block();
 	
