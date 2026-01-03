@@ -22,8 +22,7 @@
 #include "io/gif/gif.hpp"
 #include "io/image/images.hpp"
 
-#include "math/matrix/sparse_matrix.hpp"
-#include "math/matrix/sparse_vector.hpp"
+#include "math/matrix/matrix_ops.hpp"
 
 enum NeighbouringStrategy {
 	OneDNeighbouring,
@@ -40,11 +39,31 @@ autograd_compile() {
 	ScalarFunction func; // a scalar function
 	auto& g = func.generator();
 	auto u = g.create_vector_variable(140);
-	const auto expr = g.squared_norm(g.sigmoid(g.sum(u, 1.0)));
+	const double lambda = 0.01;
+	const auto expr = g.sum(
+		g.squared_norm( (g.sub(u, 1.0) )),
+		g.multiply(lambda, g.squared_norm(u) )
+	);
 	func = expr;
 
-	func()
-	std::cout << func;
+	EvalMap<float> map;
+	EigVec<float> vec(140);
+	vec.setZero();
+	vec(0) = 1.0;
+	vec(4) = 3.0;
+	vec(100) = 6.0;
+	vec(55) = 6.0;
+	vec(88) = 6.0;
+
+	// map.emplace(u, std::reference_wrapper(vec));
+	// std::cout << func;
+
+	// std::cout << "VALUE = " << func(map);
+
+	// VectorFunction deriv;
+	// func.derivative(deriv, u);
+
+	// std::cout << deriv;
 }
 
 void
@@ -106,6 +125,7 @@ hopfield_compile() {
 
 	// Instruct the network that we wish to interpret the state as a 40x40 raster.
 	dhn.set_state_strides(40);
+	dhn.set_reference_state(bs1);
 	dhn.run(bs1, 20, uc);
 	dhn.detach_logger(&logger);
 
@@ -163,6 +183,6 @@ int main() {
 	
 	autograd_compile();
 	io_utils_compile();
-	hopfield_compile();
+	// hopfield_compile();
 }
 	

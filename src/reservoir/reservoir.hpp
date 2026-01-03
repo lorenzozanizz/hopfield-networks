@@ -4,31 +4,26 @@
 
 #include "reservoir_logger.hpp"
 // Import sparse matrix required for the intra-reservoir dynamics.
-#include "../math/matrix/sparse_matrix.hpp"
 #include "../math/matrix/matrix_ops.hpp"
 
 template <typename DataType>
-class ReservoirState {
-
-	unsigned int reservoir_size;
-	std::vector<DataType> example;
-
-};
-
 class Reservoir {
 	
+	using SparseMatrix = Eigen::SparseMatrix<DataType>;
+	using ReservoirState = Eigen::Matrix<DataType, Eigen::Dynamic, 1>;
+
 	// Matrix input_weights;
 	SparseMatrix echo_weights;
-	ReservoirState<float> state;
+	ReservoirState state;
 	
 	std::vector<ReservoirLogger*> loggers;
 	
-	void attach_logger(ReservoirLogger&) {
-
+	void attach_logger(ReservoirLogger* logger) {
+		loggers.push_back(logger);
 	}
 
 	void initialize_echo_weights() {
-
+		// Sparsity degree
 	}
 
 	void initialize_input_weights() {
@@ -36,20 +31,12 @@ class Reservoir {
 	}
 
 	void feed() {
-
+		// Save the value of the next input to be employed in the next
+		// run. The value is invalidated at each call of run. 
 	}
 
-	void run() {
-		/*
-		 notify_on_run_begin();
-		 // x(t+1) = tanh( W * x(t) + Win * u(t) ) 
-		 Matrix Wx = W * state.x; 
-		 Matrix Winu = Win * u; 
-		 Matrix x_new(state.reservoir_size, 1); 
-		 for (unsigned int i = 0; i < state.reservoir_size; i++) 
-			 x_new(i, 0) = std::tanh(Wx(i, 0) + Winu(i, 0)); 
-		 state.x = x_new; 
-		 */
+	void run(bool keep_input = false) {
+
 		 notify_on_state_change();
 	}
 

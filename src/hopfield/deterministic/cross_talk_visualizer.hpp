@@ -34,7 +34,6 @@ public:
 		
 		memset(cross_talks.data(), 0, cross_talks.size() * sizeof(float));
 		const auto size = reference.get_size();
-		std::cout << "SIZE: " << size;
 		for (int i = 0; i < size; ++i) {
 			// For each entry of the state we compute its cross talk with all other
 			// units in all other pattern.
@@ -54,8 +53,6 @@ public:
 			sum_i /= -((double)(reference.get(i) ? 1 : -1)) * size;
 			if (sum_i < 0.0) sum_i = 0.0;
 			cross_talks[i] = sum_i;
-			std::cout << "->" << cross_talks[i] << ")";
-
 		}
 		did_compute = true;
 	}

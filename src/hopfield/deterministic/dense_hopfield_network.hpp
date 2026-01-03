@@ -86,7 +86,7 @@ public:
 	}
 
 	void set_reference_state(BinaryState& bs) {
-
+		ref_state.push_back(std::reference_wrapper(bs));
 	}
 
 	// Use this to avoid computation of quantities which are not required
@@ -123,24 +123,24 @@ public:
 		this->binary_state.copy_content(init_state);
 
 		auto schedule = fix_computation_schedule();
+		if (schedule.do_order_parameter && ref_state.size() == 0)
+			throw std::runtime_error("The network cant compute the order parameters because no "
+				"reference states were specified!");
 		notify_on_begin(this->binary_state, iterations);
 		for (it = 0; it < iterations; ++it) 
 		{
-				
-			notify_state(std::tuple(it, binary_state.get(it)));
-			// Initially sample the updating indices
-			notify_energy(it*it * 0.1);
-			notify_order_parameter(it * 0.2);
-			notify_temperature(2.0 + it * 0.1);
-			// then we have to actuate the update.
+			if (uc.up == UpdatePolicy::Synchronous) {
+				// Entrust the weightpolicy to compute the dot values for the states. 
+			} else if (uc.up == UpdatePolicy::GroupUpdate) {
 
+				// Stochastically select a subset of the units, then run
+			}
+			else if (uc.up == UpdatePolicy::Asynchronous) {
+				notify_state(std::tuple(it, binary_state.get(it)));
+			}
 
-
-			// Finally we notify all loggers of changes.
-			// notify_order_parameter();
-			// notify_energy();
-			// notify_state();
-
+			if (schedule.do_order_parameter)
+				compute_order_parameter();
 			// This internally calls notify_energy()
 			if (schedule.do_energy)
 				compute_energy();
@@ -149,6 +149,10 @@ public:
 		notify_on_end(this->binary_state);
 
 		return;
+	}
+
+	void compute_order_parameter() {
+		// Compute the order parameter for all reference patterns!
 	}
 
 	void compute_energy() {
