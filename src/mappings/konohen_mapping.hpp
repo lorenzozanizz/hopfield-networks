@@ -398,6 +398,18 @@ public:
 		}
 	}
 
+	const int get_input_size() const {
+		return stimulus_cortex_input_size;
+	}
+
+	const int get_map_width() const {
+		return mapping_cortex_width;
+	}
+
+	const int get_map_height() const {
+		return mapping_cortex_height;
+	}
+
 	const std::unique_ptr<DataType[]>& get_weights(unsigned int neuron_idx) const {
 		return weight_vectors[neuron_idx];
 	}

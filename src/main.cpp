@@ -23,6 +23,7 @@
 
 // Konohen mappings
 #include "mappings/konohen_mapping.hpp"
+#include "mappings/classifier/majority_mapping.hpp"
 
 // Restricted Boltzmann machines
 
