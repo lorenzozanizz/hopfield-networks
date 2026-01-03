@@ -40,20 +40,39 @@ enum NeighbouringStrategy {
 
 void
 autograd_compile() {
-	
+
 	using namespace autograd;
-	
+
 	ScalarFunction func; // a scalar function
 	auto& g = func.generator();
 	auto u = g.create_vector_variable(140);
-	const auto expr = g.squared_norm(g.sigmoid(g.sum(u, 1.0)));
+	const double lambda = 0.01;
+	const auto expr = g.sum(
+		g.squared_norm((g.sub(u, 1.0))),
+		g.multiply(lambda, g.squared_norm(u))
+	);
 	func = expr;
 
-	func()
-	std::cout << func;
-	
-	
+	EvalMap<float> map;
+	EigVec<float> vec(140);
+	vec.setZero();
+	vec(0) = 1.0;
+	vec(4) = 3.0;
+	vec(100) = 6.0;
+	vec(55) = 6.0;
+	vec(88) = 6.0;
+
+	// map.emplace(u, std::reference_wrapper(vec));
+	// std::cout << func;
+
+	// std::cout << "VALUE = " << func(map);
+
+	// VectorFunction deriv;
+	// func.derivative(deriv, u);
+
+	// std::cout << deriv;
 }
+
 
 void
 hopfield_compile() {
