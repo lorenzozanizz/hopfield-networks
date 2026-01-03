@@ -6,6 +6,7 @@
 
 #include "hopfield/states/binary.hpp"
 #include "hopfield/deterministic/dense_hopfield_network.hpp"
+#include "hopfield/stochastic/stochastic_hopfield_network.hpp"
 #include "hopfield/deterministic/cross_talk_visualizer.hpp"
 #include "hopfield/logger/logger.hpp"
 
@@ -45,32 +46,31 @@ autograd_compile() {
 
 	ScalarFunction func; // a scalar function
 	auto& g = func.generator();
-	auto u = g.create_vector_variable(140);
+	auto u = g.create_vector_variable(30);
 	const double lambda = 0.01;
 	const auto expr = g.sum(
-		g.squared_norm((g.sub(u, 1.0))),
-		g.multiply(lambda, g.squared_norm(u))
+		g.squared_l2_norm((g.sub(u, 1.0))),
+		g.multiply(lambda, g.squared_l2_norm(u))
 	);
 	func = expr;
 
 	EvalMap<float> map;
-	EigVec<float> vec(140);
+	EigVec<float> vec(30);
 	vec.setZero();
-	vec(0) = 1.0;
-	vec(4) = 3.0;
-	vec(100) = 6.0;
-	vec(55) = 6.0;
-	vec(88) = 6.0;
 
-	// map.emplace(u, std::reference_wrapper(vec));
-	// std::cout << func;
 
-	// std::cout << "VALUE = " << func(map);
+	map.emplace(u, std::reference_wrapper(vec));
+	std::cout << func;
 
-	// VectorFunction deriv;
-	// func.derivative(deriv, u);
+	std::cout << "FINAL VALUE IS  = " << func(map) << std::endl;
 
-	// std::cout << deriv;
+	VectorFunction deriv;
+	func.derivative(deriv, u);
+	std::cout << deriv;
+	EigVec<float> res(30);
+
+	deriv(map, res);
+		
 }
 
 
@@ -79,7 +79,8 @@ hopfield_compile() {
 	
 	Plotter p;
 
-	DenseHopfieldNetwork<HebbianPolicy> dhn(40 * 40);
+	DenseHopfieldNetwork<HebbianPolicy<float>> dhn(40 * 40);
+	StochasticHopfieldNetwork<HebbianPolicy<float>> shn(40 * 40);
 
 	BinaryState bs1(40 * 40), bs2(40*40), bs3(40*40);
 	auto img1 = "flower.png";
@@ -122,18 +123,25 @@ hopfield_compile() {
 	logger.finally_write_last_state_png(true, "last_state.png");
 	logger.finally_plot_data(true);
 
-	StateUtils::perturb_state(bs1,  /* Noise intensity 0 to 1*/ 0.15);
+	BinaryState bs1_orig(40 * 40);
+	bs1_orig.copy_content(bs1);
+
+	StateUtils::perturb_state(bs1,  /* Noise intensity 0 to 1*/ 0.3);
 	std::cout << "Plotting state!" << std::endl;
 	StateUtils::plot_state(p, bs1);
 
 	UpdateConfig uc = {
-		UpdatePolicy::Asynchronous
+		UpdatePolicy::GroupUpdate,
+		/* group size */ 60
 	};
 
 
 	// Instruct the network that we wish to interpret the state as a 40x40 raster.
 	dhn.set_state_strides(40);
-	dhn.run(bs1, 20, uc);
+	dhn.add_reference_state(bs1_orig);
+	dhn.add_reference_state(bs2);
+	dhn.add_reference_state(bs3);
+	dhn.run(bs1, 200, uc);
 	dhn.detach_logger(&logger);
 
 	HebbianCrossTalkTermVisualizer cttv(p, 40*40);
@@ -142,6 +150,12 @@ hopfield_compile() {
 	cttv.compute_cross_talk_view(bs1, { &bs2, &bs3 });
 	std::cout << "Devo showa" << std::endl;
 	cttv.show(40, 40);
+
+	{
+		auto ctx = p.context();
+		std::vector<int> a = { 0, 0, 1, 1, 2, 2, 3, 3 , 4};
+		ctx.show_discrete_categories(a, 3, 3, 5);
+	}
 
 
 	p.block();
@@ -184,9 +198,6 @@ io_utils_compile() {
 	}
 
 	Image img("bilbo.png", Channels::Greyscale);
-	 
-
-	
 
 }
 
@@ -537,13 +548,14 @@ cluster_classification_2D() {
 // Just create the folder...
 int main() {
 
-	cluster_classification_2D();
+	// cluster_classification_2D();
 
+	// autograd_compile();
 	/*
 	* autograd_compile();
 	io_utils_compile();
-	hopfield_compile();
 	*/
-	
+	hopfield_compile();
+
 }
 	

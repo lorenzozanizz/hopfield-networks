@@ -7,7 +7,8 @@
 #include <chrono>
 #include <thread>
 #include <stdexcept>
-
+#include <sstream>
+#include <iomanip>
 #include <tuple>
 
 // This section requires explicit support for gnuplot and cannot be compiled
@@ -55,6 +56,22 @@ public:
 	class PlottingContext {
 
 		GnuplotPipe& pipe;
+
+
+	private:
+
+		std::string random_color() {
+			static std::mt19937 rng(std::random_device{}());
+			static std::uniform_int_distribution<int> dist(0, 255);
+
+			std::ostringstream oss;
+			oss << "#"
+				<< std::hex << std::setw(2) << std::setfill('0') << dist(rng)
+				<< std::setw(2) << std::setfill('0') << dist(rng)
+				<< std::setw(2) << std::setfill('0') << dist(rng);
+
+			return oss.str();
+		}
 
 	public:
 
@@ -164,6 +181,30 @@ public:
 			return *this;
 		}
 
+		PlottingContext& show_discrete_categories(std::vector<int> buffer, int width, int height,
+			int num_categories) {
+
+			pipe.send_line("set yrange [*:*] reverse");
+			pipe.send_line("unset key");
+			pipe.send_line("set view map");
+			pipe.send_line("set palette maxcolors " + std::to_string(num_categories));
+			pipe.send_line("set palette defined ( \\");
+			for (int i = 0; i < num_categories - 1; ++i) {
+				pipe.send_line(std::to_string(i) + " \"" + random_color() + "\", \\");
+			}
+			pipe.send_line(std::to_string(num_categories-1) + " \"" + random_color() + "\")");
+			pipe.send_line("set cbtics 0,1," + std::to_string(num_categories));
+			auto raw_pipe = pipe.raw();
+			pipe.send_line("plot '-' matrix with image");
+			for (int i = 0; i < width; ++i) {
+				for (int j = 0; j < width; ++j)
+					fprintf(raw_pipe, "%d ", buffer[i * width + j]);
+				fprintf(raw_pipe, "\n");
+			}
+			pipe.send_line("e");
+			return *this;
+		}
+
 		PlottingContext& set_cblabel(const std::string& val) {
 			pipe.send_line("set cblabel '" + val + "'");
 			return *this;
@@ -190,6 +231,31 @@ public:
 				bool bit_value = (data[byte_index] >> bit_index) & 1;
 				if (bit_value) fprintf(raw_pipe, "%c", 255);
 				else fprintf(raw_pipe, "%c", 0);
+			}
+			return *this;
+		}
+
+	
+		PlottingContext& plot_multiple_sequence(std::vector<std::vector<double>> values) {
+			const unsigned long inner_size = values[0].size();
+			if (inner_size == 1) {
+				pipe.send_line("plot '-' using 0:1 with lines title 'Line'");
+				for (int j = 0; j < values.size(); ++j)
+					pipe.send_line(std::to_string(values[j][0]));
+				pipe.send_line("e");
+			}
+			else {
+				// At least 2, so send a comma
+				pipe.send_line("plot '-' using 0:1 with lines title 'Line 0', \\");
+				for (int i = 1; i < inner_size - 1; ++i)
+					pipe.send_line(" '-' using 0:1 with lines, \\");
+				if (inner_size >= 2)
+					pipe.send_line(" '-' using 0:1 with lines");
+				for (int i = 0; i < inner_size; ++i) {
+					for (int j = 0; j < values.size(); ++j)
+						pipe.send_line(std::to_string(values[j][i]));
+					pipe.send_line("e");
+				}
 			}
 			return *this;
 		}

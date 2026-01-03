@@ -31,6 +31,13 @@ public:
 
 };
 
+namespace DatasetUtils {
+
+	void load_dataset_mnist() {
+
+	}
+
+}
 
 
 #endif

@@ -4,7 +4,6 @@
 
 #include <cmath>
 
-
 // An implementation of 
 class RestrictedBoltzmannMachine {
 
