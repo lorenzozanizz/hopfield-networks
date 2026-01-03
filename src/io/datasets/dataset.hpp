@@ -6,21 +6,41 @@
 #include <vector>
 
 
-template <typename XType, typename YType>
+template <typename DataType, typename YType>
 class Dataset {
 
-public:
+private:
+    std::vector<std::unique_ptr<DataType[]>> x_data;
+    std::vector<YType> y_data;
+    size_t input_size;
 
+public:
     using index_t = std::size_t;
 
-    virtual index_t size() const = 0;
-    virtual const XType& x_of(index_t index) const = 0;
-    virtual const YType& y_of(index_t index) const = 0;
+    Dataset(size_t input_size)
+        : input_size(input_size) {}
 
-    virtual ~Dataset() = default;
+    void add_sample(const DataType* x, YType label) {
+        auto ptr = std::make_unique<DataType[]>(input_size);
+        for (size_t i = 0; i < input_size; ++i)
+            ptr[i] = x[i];
 
+        x_data.push_back(std::move(ptr));
+        y_data.push_back(label);
+    }
+
+    index_t size() const {
+        return x_data.size();
+    }
+
+    const std::unique_ptr<DataType[]>& x_of(index_t i) const {
+        return x_data.at(i);
+    }
+
+    const YType& y_of(index_t i) const {
+        return y_data.at(i);
+    }
 };
-
 
 
 #endif
