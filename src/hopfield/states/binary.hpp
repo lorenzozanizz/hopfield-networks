@@ -164,6 +164,12 @@ public:
 		return;
 	}
 
+	inline void set_value(state_index_t t, bool value) {
+		if (value)
+			set(t);
+		else unset(t);
+	}
+
 	inline long get(state_index_t bit_index) const {
 		return raw_data[bit_index >> 3] & mask_for(bit_index % 8);
 	}
@@ -234,6 +240,24 @@ public:
 };
 
 namespace StateUtils {
+
+
+	long hamming_distance(const BinaryState& s1, const BinaryState& s2) {
+		// From https://dev.to/ggorantala/hamming-distance-kcm we get the
+		// single-byte algorithm, apply it to the entire combination
+		long distance = 0;
+		// Notice that the function get_byte() already handles the edge case
+		// by zeroing out non-used bits 
+		for (int byte = 0; byte < s1.byte_size() - 1; ++byte) {
+			unsigned char xor_val = s1.get_byte(byte) ^ s2.get_byte(byte);
+			while (xor_val ^ 0) {
+				if (xor_val % 2 == 1)
+					distance += 1;
+				xor_val >>= 1;
+			}
+		}
+		return distance;
+	}
 
 	void load_state_from_stream(std::istream& input, BinaryState& bs) {
 		// Load the state from an input stream (e.g. stdin or a file)

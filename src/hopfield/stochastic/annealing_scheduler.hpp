@@ -9,9 +9,9 @@ class AnnealingScheduler {
 
 public:
 
-	virtual update(unsigned long it) = 0;
-	virtual get_temp() const = 0;
-	virtual get_stabilization_its() const = 0;
+	virtual void update(unsigned long it) = 0;
+	virtual double get_temp() const = 0;
+	virtual unsigned int get_stabilization_its() const = 0;
 
 };
 
@@ -23,12 +23,23 @@ class LinearScheduler : public AnnealingScheduler {
 
 };
 
-class CustomScheduler : public  {
+class CustomScheduler : public AnnealingScheduler {
 
 	std::function<double(unsigned long i)> temp_scheduler;
 	double temp;
 
+	void update(unsigned long it) {
+		temp = temp_scheduler(it);
+	}
 
-}
+	double get_temp()  const override {
+		return temp;
+	}
+
+	unsigned int get_stabilization_its()  const override {
+		return 1;
+	}
+
+};
 
 #endif

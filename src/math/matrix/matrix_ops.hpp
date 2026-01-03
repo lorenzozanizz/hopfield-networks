@@ -2,11 +2,15 @@
 #ifndef MATRIX_OPS_HPP
 #define MATRIX_OPS_HPP
 
+#include <stdexcept>
+#include <iostream>
+#include <cmath>
+
+#include <Eigen/Core>
+#include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 #include <Eigen/Sparse>
-#include <stdexcept>
-#include <iostream>
 
 namespace MathOps {
 	
@@ -50,7 +54,15 @@ namespace MathOps {
         return { lambda_old, b };
     }
 
-    // The following dot product implementations are
+    template <typename VectorType>
+    float lp_norm(const VectorType& v, float p) { 
+        return std::pow(v.array().abs().pow(p).sum(), 1.0f / p);
+    }
+
+    template <typename T>
+    int sgn(T val) {
+        return (T(0) < val) - (val < T(0));
+    }
 
 }
 

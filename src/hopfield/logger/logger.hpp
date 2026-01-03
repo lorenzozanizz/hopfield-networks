@@ -58,6 +58,10 @@ protected:
     NamedVectorCollection<float> nvc;
     Plotter* plotter;
 
+    // Related to the order parameters.
+    using Nuple = std::vector<double>;
+    std::vector<Nuple> parameters;
+
     std::vector<Event> interested_in;
 
     // Flags which memorize which values need to be saved for
@@ -148,13 +152,13 @@ public:
         }
     }
 
-    void on_state_update(const std::vector<std::tuple<state_index_t, unsigned char>> group_change) {
+    void on_state_update(const std::vector<state_index_t> indexes, BinaryState& group_change) {
         if (record_states) {
             if (!log_buf.write_buffer)
                 throw std::runtime_error("Attempting to update a non initialized buffer!");
-            for (const auto& tup : group_change) {
-                (reinterpret_cast<uint32_t*>(log_buf.write_buffer.get()))[std::get<0>(tup)]
-                    = (std::get<1>(tup)) ? 0xFFFFFFFF : 0;
+            for (const auto index : indexes) {
+                (reinterpret_cast<uint32_t*>(log_buf.write_buffer.get()))[index]
+                    = (group_change.get(index)) ? 0xFFFFFFFF : 0;
                 gio.write_frame(log_buf.write_buffer.get());
             }
         }
@@ -165,6 +169,7 @@ public:
             if (!log_buf.write_buffer)
                 throw std::runtime_error("Attempting to update a non initialized buffer!");
             this->update_logger_buffer(new_state, /*reset=*/ false);
+            gio.write_frame(log_buf.write_buffer.get());
         }
     }
 
@@ -178,9 +183,9 @@ public:
             nvc.append_for("Temperature", t);
     }
 
-    void on_order_parameter_update(double m) {
+    void on_order_parameter_update(std::vector<double> m1) {
         if (record_order)
-            nvc.append_for("Order parameter", m);
+            parameters.emplace_back(m1);
     }
 
     void on_run_end(const BinaryState& final_state) {
@@ -211,6 +216,11 @@ public:
                 ctx.set_title("Evolution of " + pair.first).
                     set_x_label("Iteration steps").plot_sequence(pair.second);
             }
+            if (record_order) {
+                auto ctx = plotter->context();
+                ctx.set_title("Order parameters over time").set_x_label("Iteration steps").
+                    plot_multiple_sequence(parameters);
+            }
         }
     }
 
@@ -220,7 +230,7 @@ public:
                 throw std::runtime_error("Cannot begin logging the states: no save file was specified.");
             const auto height = begin_state.get_size() / begin_state.get_stride_y();
             const auto width = begin_state.get_stride_y();
-            gio.begin(states_gif_save, width, height, /* delay in 10*ms */ 10);
+            gio.begin(states_gif_save, width, height, /* delay in 10*ms */ 2);
 
             this->update_logger_buffer(begin_state, /* reset = */ true);
             gio.write_frame(log_buf.write_buffer.get());
@@ -235,8 +245,10 @@ public:
             if (record_temperature)
                 nvc.register_name("Temperature", /* reserve */ iterations);
             // TEMPORARY: For each pattern we associate an order parameter! important
-            if (record_order)
-                nvc.register_name("Order parameter", /* reserve */ iterations);
+            if (record_order) {
+                parameters.clear();
+                parameters.reserve(iterations);
+            }
         }
     }
 
