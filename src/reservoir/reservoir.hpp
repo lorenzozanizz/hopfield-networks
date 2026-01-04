@@ -25,23 +25,33 @@ class Reservoir {
 	ReservoirState state;
 	Input input_state;
 
-	std::vector<ReservoirLogger*> loggers;
+	std::vector<ReservoirLogger<DataType>*> loggers;
 	
 	unsigned int input_dim;
 	unsigned int state_dim;
+
+	bool has_input;
 
 public:
 
 	Reservoir(unsigned int input_dim, unsigned int state_dim)
 		: input_dim(input_dim), state_dim(state_dim) {
 		input_state.resize(input_dim);
-		input_weights.resize(input_dim, input_dim);
+		input_weights.resize(state_dim, input_dim);
 		echo_weights.resize(state_dim, state_dim);
 		state.resize(state_dim);
+		state.setZero();
+
+		has_input = false;
 	}
 
-	void attach_logger(ReservoirLogger* logger) {
+	void attach_logger(ReservoirLogger<DataType>* logger) {
 		loggers.push_back(logger);
+	}
+
+	void detach_logger(ReservoirLogger<DataType>* logger) {
+		loggers.erase(
+			std::remove(loggers.begin(), loggers.end(), logger), loggers.end());
 	}
 
 	void initialize_echo_weights(
@@ -60,6 +70,8 @@ public:
 		std::uniform_real_distribution<float> unif(0, 1);
 		std::normal_distribution<DataType> norm(0, 1);
 		
+
+		triplets_vector.reserve(static_cast<long>(state_dim * state_dim * sparsity));
 		for (int i = 0; i < state_dim; ++i)
 			for (int j = 0; j < state_dim; ++j) {
 				// Only put nonzero with probability sparsity
@@ -67,8 +79,8 @@ public:
 					triplets_vector.push_back(Trip(i, j, norm(gen)));
 			}
 
-		echo_weights.setFromTriplets(triplets_vector);
-		double current_radius = MathOps::power_method(echo_weights);
+		echo_weights.setFromTriplets(triplets_vector.begin(), triplets_vector.end());
+		double current_radius = MathOps::sparse_power_method(echo_weights);
 
 		if (current_radius > 0)
 			echo_weights *= (spectral_radius_desired / current_radius);
@@ -99,16 +111,35 @@ public:
 		}
 	}
 
-
-	void feed() {
+	void feed(const Input& u) {
 		// Save the value of the next input to be employed in the next
 		// run. The value is invalidated at each call of run. 
+		assert(u.size() == static_cast<int>(input_dim)); 
+		input_state = u;
+		has_input = true;
 	}
 
-	void run(bool keep_input = false) {
-
-		// Notify the loggers that the state has changed.
+	void run(unsigned int steps = 1, bool keep_input = false) {
+		ReservoirState pre_activation;
+		if (has_input)
+			pre_activation = echo_weights * state + input_weights * input_state;
+		else
+			pre_activation = echo_weights * state;
+		state = pre_activation.array().tanh().matrix();
+		if (!keep_input) {
+			has_input = false;
+			input_state.setZero();
+		}
+		notify_on_norm_change();
 		notify_on_state_change();
+	}
+
+	void begin_run() {
+		notify_on_run_begin();
+	}
+
+	void end_run() {
+		notify_on_run_end();
 	}
 
 	ReservoirState& get_state() {
@@ -120,13 +151,21 @@ public:
 	}
 
 	void notify_on_state_change() {
-		for (auto* o : loggers) o->on_state_change( );
+		for (auto* o : loggers) o->on_state_update( state );
+	}
+
+	void notify_on_norm_change() {
+		auto norm = state.norm();
+		for (auto* o : loggers) o->on_norm_update(norm);
 	}
 
 	void notify_on_run_begin() {
-		for (auto* o : loggers) o->on_run_begin( );
+		for (auto* o : loggers) o->on_run_begin( state);
 	}
 
+	void notify_on_run_end() {
+		for (auto* o : loggers) o->on_run_end();
+	}
 };
 
 #endif

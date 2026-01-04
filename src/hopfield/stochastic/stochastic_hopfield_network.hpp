@@ -106,7 +106,7 @@ public:
 
 				for (int i = 0; i < uc.group_size; ++i)
 					this->binary_state.set_value(update_indexes[i],
-						MathOps::sgn(local_fields_out[i]) > 0);
+						compute_value(this->local_fields_out[i], temp_sched->get_temp()));
 
 				this->notify_state(update_indexes, this->binary_state);
 			}
@@ -120,10 +120,13 @@ public:
 					local_fields_out
 				);
 				// Apply the signum activation function and notify. 
-				this->binary_state.set_value(state_index, MathOps::sgn(local_fields_out[0]) > 0);
+				this->binary_state.set_value(state_index, compute_value(this->local_fields_out[0], temp_sched->get_temp()));
 
 				this->notify_state(std::tuple(state_index, this->binary_state.get(state_index)));
 			}
+
+			if (schedule.do_temperature)
+				this->notify_temperature(temp_sched->get_temp());
 
 			if (schedule.do_order_parameter)
 				this->compute_order_parameter(it);

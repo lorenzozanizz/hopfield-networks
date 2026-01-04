@@ -11,99 +11,114 @@
 template <typename DataType>
 class MultiLayerPerceptron {
 
-public:
-
-    using Mat = Eigen::Matrix< DataType, Eigen::Dynamic, Eigen::Dynamic>;
-    using Vec = Eigen::Matrix< DataType, 1, Eigen::Dynamic>;
+    using Matrix = Eigen::Matrix< DataType, Eigen::Dynamic, Eigen::Dynamic>;
+    using Vector = Eigen::Matrix< DataType, 1, Eigen::Dynamic>;
 
     struct Activation {
-        std::function<Vec(const Vec&)> f;
-        std::function<Vec(const Vec&)> df;
+        std::function<Vector(const Vector&)> f;
+        std::function<Vector(const Vector&)> df;
     };
 
-    /*
-    // Constructor: layer sizes + activations
+    std::vector<int> layer_sizes;
+    std::vector<Activation> act_functions;
+
+    int num_layers;  // number of layers
+
+    // Parameters
+    std::vector<Matrix> W, dW;
+    std::vector<Vector> b, db;
+
+    // Forward pass buffers
+    std::vector<Matrix> A;   // activations
+    std::vector<Matrix> Z;   // pre-activations
+
+    // Backprop buffers
+    std::vector<Matrix> delta;
+
+public:
+
     MultiLayerPerceptron(
         const std::vector<int>& layers,
         const std::vector<Activation>& activations
-    ): layers(layers), activations(activations)
+    ) : layer_sizes(layers), act_functions(activations)
     {
-        initalize_weights();
+        assert(activations.size() == layers.size() - 1);
+        num_layers = layers.size();
+        initialize_weights();
     }
 
-    // Forward pass
-    Vec forward(const Vec& input) {
-        a[0] = input;
-        for (int l = 1; l < L; ++l) {
-            z[l] = W[l] * a[l - 1] + b[l];
-            a[l] = activations[l - 1].f(z[l]);  // activation for layer l
+    // Forward pass: X is (input_dim × batch_size)
+    Matrix forward(const Matrix& X) {
+        // The first layer has no activations ( we can jut include them 
+        // in any preprocessing we need)
+        A[0] = X;
+
+        for (int l = 1; l < num_layers; ++l) {
+            // Z[l] = W[l] * A[l-1] + b[l] (broadcasted with eigen)
+            Z[l] = (W[l] * A[l - 1]).colwise() + b[l];
+            A[l] = act_functions[l - 1].f(Z[l]);
         }
-        return a[L - 1];
+        return A[num_layers - 1];
     }
 
-    // Backpropagation: given dLoss/da(L)
-    void backward(const Vec& dLoss_daL) {
-        delta[L - 1] = dLoss_daL.cwiseProduct(activations[L - 2].df(z[L - 1]));
+    void backward(const Matrix& dLoss_dA_L) {
+        int batch_size = dLoss_dA_L.cols();
 
-        for (int l = L - 2; l >= 1; --l) {
-            delta[l] = (W[l + 1].transpose() * delta[l + 1])
-                .cwiseProduct(activations[l - 1].df(z[l]));
+        // Output layer delta
+        delta[num_layers - 1] =
+            dLoss_dA_L.cwiseProduct(act_functions[num_layers - 2].df(Z[num_layers - 1]));
+
+        // Hidden layers
+        for (int l = num_layers - 2; l >= 1; --l) {
+            delta[l] =
+                (W[l + 1].transpose() * delta[l + 1])
+                .cwiseProduct(act_functions[l - 1].df(Z[l]));
         }
 
-        for (int l = 1; l < L; ++l) {
-            dW[l] = delta[l] * a[l - 1].transpose();
-            db[l] = delta[l];
+        // Gradients
+        for (int l = 1; l < num_layers; ++l) {
+            dW[l] = (delta[l] * A[l - 1].transpose()) / batch_size;
+            db[l] = delta[l].rowwise().mean();
         }
     }
 
-    // SGD update
-    void apply_gradients(float lr) {
-        for (int l = 1; l < L; ++l) {
+    // SGD update, the batch normalization factor is absorbed by the learning
+    // rate as standard.
+    void apply_gradients(DataType lr) {
+        for (int l = 1; l < num_layers; ++l) {
             W[l] -= lr * dW[l];
             b[l] -= lr * db[l];
         }
     }
 
-    // Accessors
-    const std::vector<Mat>& get_weights() const { return W; }
+    const std::vector<Matrix>& get_weights() const { return W; }
 
 private:
-    std::vector<int> layers;
-    std::vector<Activation> activations;
 
-    int L;  // number of layers
+    void initialize_weights() {
 
-    std::vector<Mat> W, dW;
-    std::vector<Vec> b, db;
-    std::vector<Vec> a, z, delta;
-
-    void initalize_weights() {
-        L = layers.size();
-
-        W.resize(L);
-        b.resize(L);
-        dW.resize(L);
-        db.resize(L);
-        a.resize(L);
-        z.resize(L);
-        delta.resize(L);
+        W.resize(num_layers); b.resize(num_layers); dW.resize(num_layers); db.resize(num_layers);
+        A.resize(num_layers); Z.resize(num_layers); delta.resize(num_layers);
 
         std::mt19937 gen(std::random_device{}());
-        std::normal_distribution<float> dist(0.0f, 0.1f);
 
-        for (int l = 1; l < L; ++l) {
-            W[l] = Mat(layers[l], layers[l - 1]);
-            b[l] = Vec(layers[l]);
+        for (int l = 1; l < num_layers; ++l) {
 
-            for (int i = 0; i < W[l].rows(); ++i)
-                for (int j = 0; j < W[l].cols(); ++j)
+            int rows = layer_sizes[l];
+            int cols = layer_sizes[l - 1];
+            float stddev = 1.0f / std::sqrt(layer_sizes[l - 1]);
+            std::normal_distribution<DataType> dist(0.0, stddev);
+
+            W[l].resize(rows, cols);
+            b[l].resize(rows);
+
+            for (int i = 0; i < rows; ++i)
+                for (int j = 0; j < cols; ++j)
                     W[l](i, j) = dist(gen);
 
             b[l].setZero();
         }
     }
-
-    */
 };
 
 
