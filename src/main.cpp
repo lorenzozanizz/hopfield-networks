@@ -30,6 +30,7 @@
 #include "io/plot/plot.hpp"
 #include "io/gif/gif.hpp"
 #include "io/image/images.hpp"
+#include "io/datasets/dataset.hpp"
 
 
 
@@ -571,14 +572,91 @@ cluster_classification_2D() {
 	}
 }
 
+void classification_test() {
+
+  // Parameters
+	unsigned int input_size = 2;       // each input vector has 3 features
+	unsigned int iterations = 300;
+	double learning_rate = 0.5;
+
+
+	// Parameters
+	double sigma0 = 2.0;
+	double tau = 10.0;
+	unsigned int map_width = 10;
+	unsigned int map_height = 2;
+	std::string evolving_func = "exponential";
+
+
+	KonohenMap<double> km(map_width, map_height, input_size);
+
+	// Create NeighbouringFunction
+	NeighbouringFunction nf(sigma0, tau, map_width, map_height, evolving_func);
+
+	// Set support size
+	nf.set_support_size(2);  
+
+	km.initialize(42);
+
+	std::vector<std::unique_ptr<double[]>> data;
+	for (int i = 0; i < 5; ++i) {
+		auto vec = std::make_unique<double[]>(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec[j] = 1 + i * 0.1;  // simple values: 0, 1.1, 2.2 etc
+		}
+		data.push_back(std::move(vec));
+	}
+
+	for (int i = 5; i < 10; ++i) {
+		auto vec = std::make_unique<double[]>(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec[j] = 55 + i * 0.1;  // simple values: 0, 1.1, 2.2 etc
+		}
+		data.push_back(std::move(vec));
+	}
+
+	km.train(data, iterations, nf, learning_rate);
+
+	std::map<int, std::string> labels_map;
+	labels_map[0] = "ones";
+	labels_map[1] = "fifties";
+
+	MajorityMapping<double> classifier(km, 0.8, labels_map); 
+
+	Dataset<double, int> dataset(10);
+
+	for (int i = 0; i < 5; ++i) {
+		dataset.add_sample(data[i].get(), 0);
+	}
+
+	for (int i = 5; i < 10; ++i) {
+		dataset.add_sample(data[i].get(), 1);
+	}
+
+	classifier.classify(dataset);
+
+	for (unsigned int k = 0; k < map_height; ++k) {
+		for (unsigned int i = 0; i < map_width; ++i) {
+			std::cout << "Neuron (" << i << ", " << k << ")" << ": ";
+			for (unsigned int j = 0; j < input_size; ++j) {
+				std::cout << km.get_weights(i + k * map_width)[j] << " ";
+			}
+			std::cout << "\n labeled as: ";
+			std::cout << classifier.label_for(i+k*map_width) << "\n\n";
+		}
+
+	}
+
+}
+
 // Just create the folder...
 int main() {
 
-	// cluster_classification_2D();
+	classification_test();
 
 	// autograd_compile();
 	/*
-	* autograd_compile();
+	autograd_compile();
 	io_utils_compile();
 	*/
 	reservoir_compile();
