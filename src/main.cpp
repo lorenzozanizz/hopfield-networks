@@ -24,6 +24,7 @@
 // Konohen mappings
 #include "mappings/konohen_mapping.hpp"
 #include "mappings/classifier/majority_mapping.hpp"
+#include "mappings/clustering/u_clustering.hpp"
 
 // Restricted Boltzmann machines
 
@@ -622,11 +623,82 @@ void classification_test() {
 
 	}
 
+	Plotter plotter;
+	classifier.plot(plotter);
+
+}
+
+void clustering_test() {
+	// Parameters
+	unsigned int input_size = 10;       // each input vector has 3 features
+	unsigned int iterations = 500;
+	double learning_rate = 0.5;
+
+
+	// Parameters
+	double sigma0 = 2.0;
+	double tau = 10.0;
+	unsigned int map_width = 10;
+	unsigned int map_height = 10;
+	std::string evolving_func = "exponential";
+
+
+	KonohenMap<double> km(map_width, map_height, input_size);
+
+	// Create NeighbouringFunction
+	NeighbouringFunction nf(sigma0, tau, map_width, map_height, evolving_func);
+
+	// Set support size
+	nf.set_support_size(2);
+
+	km.initialize(42);
+
+	std::vector<std::unique_ptr<double[]>> data;
+	for (int i = 0; i < 5; ++i) {
+		auto vec = std::make_unique<double[]>(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec[j] = 1; 
+		}
+		data.push_back(std::move(vec));
+	}
+
+	for (int i = 5; i < 10; ++i) {
+		auto vec = std::make_unique<double[]>(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec[j] = 20;  
+		}
+		data.push_back(std::move(vec));
+	}
+	
+	for (int i = 10; i < 15; ++i) {
+		auto vec = std::make_unique<double[]>(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec[j] = 8;  
+		}
+		data.push_back(std::move(vec));
+	}
+	/*
+	for (int i = 15; i < 20; ++i) {
+		auto vec = std::make_unique<double[]>(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec[j] = 2 + i * 0.1;  // simple values: 0, 1.1, 2.2 etc
+		}
+		data.push_back(std::move(vec));
+	}*/
+
+	km.train(data, iterations, nf, learning_rate);
+
+	UClustering<double> UMap(km, 0.4); 
+	UMap.compute(); 
+	Plotter plotter;
+	UMap.plot(plotter);
+
 }
 
 // Just create the folder...
 int main() {
 
+	//clustering_test();
 	classification_test();
 
 	// autograd_compile();
@@ -634,7 +706,7 @@ int main() {
 	autograd_compile();
 	io_utils_compile();
 	*/
-	hopfield_compile();
+	//hopfield_compile();
 
 }
 	

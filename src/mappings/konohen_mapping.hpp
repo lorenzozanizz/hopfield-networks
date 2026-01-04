@@ -267,6 +267,10 @@ public:
 			return (std::exp(- (dist * dist) / (2 * sigma * sigma)));
 		}
 
+		void set_support(int dist) {
+			support = dist;
+		}
+
 
 	};
 
@@ -414,13 +418,13 @@ public:
 		return weight_vectors[neuron_idx];
 	}
 
+
+
 	// This function receives a collection of datavectors and has to train the mapping cortex
 	void train(const std::vector<std::unique_ptr<DataType[]>>& data,
 		unsigned int iterations,
 		NeighbouringFunction& nf,
 		double learning_rate = 0.1 ) {
-
-		
 
 		for (unsigned int t = 0; t < iterations; t++) {
 			for (const auto& input : data) {
