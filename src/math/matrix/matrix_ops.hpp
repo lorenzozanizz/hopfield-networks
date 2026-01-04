@@ -16,9 +16,9 @@ namespace MathOps {
 	
 	using namespace Eigen;
 
-    template <typename MatrixType>
-    std::pair<double, VectorXd> power_method(
-        const MatrixType& A,
+    template <typename DenseMatrixType>
+    double power_method(
+        const DenseMatrixType& A,
         int max_iters = 50,
         double tol = 1e-7
     ) {
@@ -38,12 +38,13 @@ namespace MathOps {
                 throw std::runtime_error("A has a zero eigenvalue; power method failed.");
 
             // Compute the versor and the new estimate of lambda
-            VectorXd b_new = Ab / norm;
+            VectorXd b_new = Ab;
+            b_new /= norm;
             double lambda = b_new.dot(A * b_new);
 
             // Check convergence with step size criterion.
             if (std::abs(lambda - lambda_old) < tol) {
-                return { lambda, b_new };
+                return lambda;
             }
 
             b = b_new;
@@ -51,7 +52,49 @@ namespace MathOps {
         }
 
         // If we reach here, we did not converge! 
-        return { lambda_old, b };
+        return lambda_old;
+    }
+
+    template <typename DataType>
+    double sparse_power_method(
+        const SparseMatrix<DataType>& A,
+        int max_iters = 50,
+        double tol = 1e-7
+    ) {
+        using Vector = Matrix<DataType, Eigen::Dynamic, 1>;
+
+        const int n = A.rows();
+        Vector b = Vector::Random(n);   // initial guess
+        b.normalize();
+
+        double lambda_old = 0.0;
+
+        for (int iter = 0; iter < max_iters; ++iter) {
+            Vector Ab = A * b;
+            
+            double norm = Ab.norm();
+            // If the matrix has a non-trivial null space we are blocked in there forever
+            // so the algorithm cannot terminate.
+            if (norm == 0.0)
+                throw std::runtime_error("A has a zero eigenvalue; power method failed.");
+
+            // Compute the versor and the new estimate of lambda
+            Ab /= norm;
+            // This is required because of the 
+            double lambda = Ab.dot(A * Ab);
+
+            // Check convergence with step size criterion.
+            if (std::abs(lambda - lambda_old) < tol) {
+                return lambda;
+            }
+
+            b = Ab;
+            lambda_old = lambda;
+           
+        }
+
+        // If we reach here, we did not converge! 
+        return lambda_old;
     }
 
     template <typename VectorType>

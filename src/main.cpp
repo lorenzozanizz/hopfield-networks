@@ -171,7 +171,33 @@ konohen_compile() {
 
 void 
 reservoir_compile() {
+	Reservoir<float> reservoir(10, 400);
+	ReservoirLogger<float> logger;
 
+	reservoir.attach_logger(&logger);
+
+	reservoir.initialize_echo_weights(0.1, SamplingType::Uniform);
+	reservoir.initialize_input_weights(SamplingType::Normal);
+
+	Plotter p;
+	logger.set_collect_norm(true);
+	logger.set_collect_states(true, "res_states.gif", 20, 20);
+	logger.finally_plot(true);
+	logger.assign_plotter(&p);
+
+	Eigen::VectorXf input(10);
+	input(1) = 0.4;
+	input(2) = 0.5;
+	input(0) = 0.1;
+
+	reservoir.begin_run();
+	reservoir.feed(input);
+	for (int i = 0; i < 20; ++i) {
+		reservoir.run();
+	}
+	reservoir.end_run();
+
+	p.block();
 }
 
 void 
@@ -358,7 +384,6 @@ test_1D_konohen_map() {
 		std::cout << "\n";
 	}
 }
-
 
 void
 test_2D_konohen_map() {
@@ -556,7 +581,8 @@ int main() {
 	* autograd_compile();
 	io_utils_compile();
 	*/
-	hopfield_compile();
+	reservoir_compile();
+	// hopfield_compile();
 
 }
 	
