@@ -27,7 +27,7 @@
 *.smod
 
 CppProperties.*
-
+examples/reservoir/amsc_env
 build/
 
 ## Ignore Visual Studio temporary files, build results, and

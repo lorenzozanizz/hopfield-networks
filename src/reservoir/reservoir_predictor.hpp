@@ -6,18 +6,78 @@
 #include <functional>
 #include <random>
 
+// To collect and plot information about the loss functions
+#include "../io/plot/plot.hpp"
+#include "../io/datasets/data_collection.hpp"
+
+// To compute the loss gradient automatically.
+#include "../math/autograd/variables.hpp"
+#include "../math/autograd/functions.hpp"
 #include "../math/matrix/matrix_ops.hpp"
+
+template <typename DataType>
+class ActivationFunction {
+    
+public:
+
+    using Matrix = Eigen::Matrix<DataType, Eigen::Dynamic, Eigen::Dynamic>;
+
+    std::function<Matrix(const Matrix&)> f;
+    std::function<Matrix(const Matrix&)> df;
+};
+
+template <typename DataType>
+class Activations {
+
+public:
+
+    using Matrix = Eigen::Matrix<DataType, Eigen::Dynamic, Eigen::Dynamic>;
+
+    static const ActivationFunction<DataType> sigmoid;
+    static const ActivationFunction<DataType> tanh;
+    static const ActivationFunction<DataType> relu;
+};
+
+template <typename DataType>
+const ActivationFunction<DataType> Activations<DataType>::sigmoid = {
+    // f(x)
+    [](const Matrix& x) -> Matrix {
+        return (1.0 / (1.0 + (-x.array()).exp())).matrix();
+    },
+    // df(x)
+    [](const Matrix& x) -> Matrix {
+        auto s = (1.0 / (1.0 + (-x.array()).exp()));
+        return (s * (1.0 - s)).matrix();
+    }
+};
+
+template <typename DataType>
+const ActivationFunction<DataType> Activations<DataType>::tanh = {
+    [](const Matrix& x) -> Matrix {
+        return x.array().tanh().matrix();
+    },
+    [](const Matrix& x) -> Matrix {
+        return (1.0 - x.array().tanh().square()).matrix();
+    }
+};
+
+template <typename DataType>
+const ActivationFunction<DataType> Activations<DataType>::relu = {
+    [](const Matrix& x) -> Matrix {
+        return x.array().max(DataType(0)).matrix();
+    },
+    [](const Matrix& x) -> Matrix {
+        return (x.array() > DataType(0)).template cast<DataType>().matrix();
+    }
+};
 
 template <typename DataType>
 class MultiLayerPerceptron {
 
+    using Activation = ActivationFunction<DataType>;
     using Matrix = Eigen::Matrix< DataType, Eigen::Dynamic, Eigen::Dynamic>;
-    using Vector = Eigen::Matrix< DataType, 1, Eigen::Dynamic>;
-
-    struct Activation {
-        std::function<Vector(const Vector&)> f;
-        std::function<Vector(const Vector&)> df;
-    };
+    // This is a COLUMN vector! otherwise eigen cries
+    using Vector = Eigen::Matrix< DataType, Eigen::Dynamic, 1>;
 
     std::vector<int> layer_sizes;
     std::vector<Activation> act_functions;
@@ -52,7 +112,7 @@ public:
         // The first layer has no activations ( we can jut include them 
         // in any preprocessing we need)
         A[0] = X;
-
+        
         for (int l = 1; l < num_layers; ++l) {
             // Z[l] = W[l] * A[l-1] + b[l] (broadcasted with eigen)
             Z[l] = (W[l] * A[l - 1]).colwise() + b[l];
@@ -91,14 +151,19 @@ public:
         }
     }
 
-    const std::vector<Matrix>& get_weights() const { return W; }
+    const std::vector<Matrix>& get_weights() const { 
+        return W; 
+    }
 
 private:
 
     void initialize_weights() {
 
-        W.resize(num_layers); b.resize(num_layers); dW.resize(num_layers); db.resize(num_layers);
-        A.resize(num_layers); Z.resize(num_layers); delta.resize(num_layers);
+        // Resize all the vector with the correct sizes. Note that this does
+        // not yet allocate the memory for the eigen matrices!
+        W.resize(num_layers); b.resize(num_layers); dW.resize(num_layers); 
+        db.resize(num_layers); A.resize(num_layers); Z.resize(num_layers); 
+        delta.resize(num_layers);
 
         std::mt19937 gen(std::random_device{}());
 
@@ -106,6 +171,8 @@ private:
 
             int rows = layer_sizes[l];
             int cols = layer_sizes[l - 1];
+            // We use a glorot kind initialization strategy so that the weights
+            // are zero-mean normal with std_dev given by 1/sqrt(input size)
             float stddev = 1.0f / std::sqrt(layer_sizes[l - 1]);
             std::normal_distribution<DataType> dist(0.0, stddev);
 
@@ -116,15 +183,65 @@ private:
                 for (int j = 0; j < cols; ++j)
                     W[l](i, j) = dist(gen);
 
+            // Zero initialize the bias in this implementation. 
             b[l].setZero();
         }
     }
 };
 
 
-class ReservoirPredictor {
+template <typename DataType>
+class NetworkTrainer {
 
-	unsigned int output_size;
+
+    using Network = MultiLayerPerceptron<DataType>;
+    using LossFunction = autograd::ScalarFunction<DataType>;
+    using LossGradient = autograd::VectorFunction<DataType>;
+    using LastOutput = autograd::VectorVariable; 
+
+    Network& network;
+    LossFunction& loss_function;
+  
+    LossGradient gradient_generator;
+
+    bool record_loss;
+    bool record_verif_loss;
+
+public:
+
+    NetworkTrainer( Network& network ): network(network)
+    { }
+
+    void set_loss_function(LossFunction& loss) {
+        loss_function = loss;
+    }
+
+    void setup_autograd(LastOutput var) {
+        loss_function.derivative(var, gradient_generator);
+    }
+
+    void feed_additional_loss_variables() {
+
+    }
+
+    // Avoid something fancy like a generator expression for the 
+    // datasets to avoiding the handling of too much data at once, even though
+    // it would be a good idea in principle. 
+    void train() {
+
+    }
+
+    void do_log_loss(bool value) {
+        record_loss = value;
+    }
+
+    void do_log_verification_loss(bool value) {
+        record_verif_loss = true;
+    }
+
+    void plot_loss(Plotter& plotter) {
+
+    }
 
 
 };

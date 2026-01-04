@@ -172,7 +172,7 @@ konohen_compile() {
 
 void 
 reservoir_compile() {
-	Reservoir<float> reservoir(10, 400);
+	Reservoir<float> reservoir(10, 30);
 	ReservoirLogger<float> logger;
 
 	reservoir.attach_logger(&logger);
@@ -182,8 +182,7 @@ reservoir_compile() {
 
 	Plotter p;
 	logger.set_collect_norm(true);
-	logger.set_collect_states(true, "res_states.gif", 20, 20);
-	logger.finally_plot(true);
+	logger.set_collect_states(true, "res_states.gif", 6, 6);
 	logger.assign_plotter(&p);
 
 	Eigen::VectorXf input(10);
@@ -198,7 +197,60 @@ reservoir_compile() {
 	}
 	reservoir.end_run();
 
-	p.block();
+	std::vector<int> units = { 30, 30, 10 };
+	auto sigmoid = Activations<float>::sigmoid;
+	std::vector<ActivationFunction<float>> acts = { sigmoid , sigmoid };
+
+	MultiLayerPerceptron<float> mlp(units, acts) ;
+	
+	Eigen::MatrixXf inputs(30, 4); 
+
+
+	using namespace autograd;
+
+	ScalarFunction loss_function;
+	auto& g = func.generator();
+	auto y		= g.create_vector_variable(10);
+	auto y_hat  = g.create_vector_variable(10);
+	loss_function = g.squared_l2_norm((g.sub(y, y_hat)));
+
+	EvalMap<float> map;
+	EigVec<float> vec(10);
+	vec.setZero();
+
+	EigVec<float> vec_ref(10);
+	vec_ref(2) = 3.0;
+
+	EigVec<float> vec_input(30);
+	vec_input(3) = 1.0;
+	Eigen::MatrixXf out = mlp.forward(vec_input);
+	
+	vec = out.col(0);
+
+	map.emplace(y, vec);
+	map.emplace(y_hat, vec_ref);
+
+	std::cout << "Value of the loss : " << func( map ) << std::endl;
+
+	VectorFunction deriv;
+	func.derivative(deriv, y);
+	
+	Eigen::VectorXf loss_grad(10);
+
+	deriv(map, loss_grad);
+	mlp.backward(loss_grad);
+
+	int batch_size = 1;
+	// EigVec<float> res(30);
+
+	// deriv(map, res);
+	mlp.apply_gradients(0.1 / batch_size);
+
+	out = mlp.forward(vec_input);
+	vec = out.col(0);
+
+	std::cout << "Value of the loss : " << func(map) << std::endl;
+
 }
 
 void 
@@ -652,7 +704,7 @@ void classification_test() {
 // Just create the folder...
 int main() {
 
-	classification_test();
+	// classification_test();
 
 	// autograd_compile();
 	/*

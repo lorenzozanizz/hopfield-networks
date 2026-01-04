@@ -48,6 +48,7 @@ namespace autograd {
         Summation,
         LpNorm,
         LpNormDer,
+        SoftMax,
         SoftMaxCrossEntropy,
         // Reserved for future (?) use
         Custom
@@ -148,10 +149,11 @@ namespace autograd {
 
     };
 
+    using VectorVariable = ExpressionNode*;
+
     // Very simple global owner for all nodes (no deallocation, OK for a toy base)
     class NodeGenerator {
 
-        using VectorVariable = ExpressionNode*;
 
         std::vector<std::unique_ptr<ExpressionNode>> nodes;
 
@@ -230,7 +232,6 @@ namespace autograd {
         ExpressionNode* multiply(ExpressionNode* node, double value) {
             // This always ensure that the scalar in VectorScalarMultiply is the first children.
 
-            std::cout << "mi hanno chiamato col valore di " << value << std::endl;
             auto* val = create_vector_constant(/* dimension */ 1, value);
             if (node->is_2d())
                 throw std::runtime_error("Operation not supported!");
@@ -246,7 +247,6 @@ namespace autograd {
         ExpressionNode* multiply(double value, ExpressionNode* node) {
             return multiply(node, value);
         }
-
 
         ExpressionNode* multiply(ExpressionNode* x, ExpressionNode* y) {
             // This always ensure that the scalar in VectorScalarMultiply is the first children.
@@ -291,6 +291,8 @@ namespace autograd {
             return pow(lp, 2);
         }
 
+
+    
         void dealloc_all() {
             nodes.clear();
         }
@@ -349,6 +351,15 @@ namespace autograd {
         inline ExpressionNode* lp_norm(ExpressionNode* x, unsigned int p) {
             auto* node = create_vector_op(ExpressionType::LpNorm, { x }, 1);
             node->set_p_norm(p);
+            return node;
+        }
+        ExpressionNode* smce_logits_true(ExpressionNode* logits, ExpressionNode* tru) {
+            auto* node = create_vector_op(ExpressionType::SoftMaxCrossEntropy, { logits, tru }, 1);
+            return node;
+        }
+
+        ExpressionNode* softmax(ExpressionNode* logits) {
+            auto* node = create_vector_op(ExpressionType::SoftMax, { logits }, logits->cols());
             return node;
         }
 
@@ -453,10 +464,6 @@ namespace autograd {
                 auto& frame = st.top();
                 ExpressionNode* node = frame.node;
 
-                std::cout << "Nodo attuale:" << std::endl;
-                print_as_binary_tree(node);
-                std::cout << "\n\n" << std::endl;
-
                 // Cached?
                 if (cache.count(node)) {
                     st.pop();
@@ -490,9 +497,7 @@ namespace autograd {
             auto* der = cache[root];
             // Perform all possible optimizations on the graph. 
             unsigned int performed_opts;
-            std::cout << "UNOPTIMIZED:" << std::endl;
             print_as_binary_tree(der);
-            std::cout << "\n\n";
             do {
                 performed_opts = 0;
                 optimize(der, gen, performed_opts);
@@ -504,7 +509,6 @@ namespace autograd {
 
         ExpressionNode* differentiate_node(ExpressionNode* node, const std::vector<ExpressionNode*>& dchildren,
             VectorVar var, NodeGenerator& gen) {
-            std::cout << "DIFFERENZIO UN NODO DI TIPO" << stringify_type(node->get_type()) << std::endl;
 
             if (node->get_type() == ExpressionType::Constant) {
                 if (node->cols() == 1)
@@ -523,6 +527,11 @@ namespace autograd {
                     return gen.identity(var->cols());
                 else return gen.zero(var->cols(), node->cols());
             }
+            else if (node->get_type() == ExpressionType::SoftMaxCrossEntropy) {
+                auto logits = node->get_children()[0];
+                auto ref_val = node->get_children()[1];
+                return gen.sub(gen.softmax(logits), ref_val);
+            }
             else if (node->get_type() == ExpressionType::ScalarMultiply) {
                 auto left_d = dchildren[0];
                 auto left = node->get_children()[0];
@@ -530,7 +539,7 @@ namespace autograd {
                 auto right = node->get_children()[1];
 
                 return gen.sum(
-                    gen.multiply(left_d, right), 
+                    gen.multiply(left_d, right),
                     gen.multiply(left, right_d)
                 );
             }
@@ -545,7 +554,6 @@ namespace autograd {
                 return gen.sub(left_d, right_d);
             }
             else if (node->get_type() == ExpressionType::ScalarPower) {
-                std::cout << "differnetiati power: " << node->get_pow() << std::endl;
                 if (node->get_pow() == 1)
                     return dchildren[0];
                 else
@@ -553,8 +561,9 @@ namespace autograd {
                         gen.multiply(
                             gen.pow(node->get_children()[0], node->get_pow() - 1),
                             node->get_pow()
-                    ), dchildren[0]);
+                        ), dchildren[0]);
             }
+            else throw std::runtime_error("operation not supported!");
             return nullptr;
         }
 
@@ -601,7 +610,6 @@ namespace autograd {
                     return gen.negation(children[1]);
             }
             if (node->get_type() == ExpressionType::ScalarPower) {
-                std::cout << "rewriting power scalar but " << node->get_pow() << std::endl;
                 if (node->get_pow() == 1)
                     return node->get_children()[0];
             }
@@ -683,7 +691,6 @@ namespace autograd {
         EigVec<ScalarType> result(root->cols());
        
         for (ExpressionNode* node : eval_ordering) {
-            std::cout << "VALUTO" << stringify_type(node->get_type()) << std::endl;
             switch (node->get_type()) {
             case ExpressionType::Variable: {
                 // Simply take the memory stored in eval data and copy it into the vector.
@@ -706,7 +713,6 @@ namespace autograd {
             case ExpressionType::Add: {
                 auto* a = node->get_children()[0];
                 auto* b = node->get_children()[1];
-                std::cout << "Aggiungo " << cache[a]  << a << " e anche " << cache[b] << b << std::endl;
                 cache[node] = cache[a] + cache[b];
                 break;
             }
@@ -717,7 +723,6 @@ namespace autograd {
                 EigVec<ScalarType> scalar(1);
                 scalar(0) = cache[a](0) * cache[b](0);
                 cache[node] = scalar;
-                std::cout << "hO prodotto: " << scalar << std::endl; 
                 break;
             }
             case ExpressionType::VectorScalarMultiply: {
@@ -726,17 +731,38 @@ namespace autograd {
                 auto* scalar = node->get_children()[0];
                 auto* b = node->get_children()[1];
                 ScalarType scalar_value = static_cast<ScalarType>(cache[scalar](0));
-                std::cout << "Mooltiplico per " << scalar_value << std::endl;
                 cache[node] = scalar_value * cache[b];
+                break;
+            }
+            case ExpressionType::SoftMaxCrossEntropy: {
+                const ScalarType eps = ScalarType(1e-12);
+                auto* logits = node->get_children()[0];
+                auto* tru = node->get_children()[1];
+                // Evaluate the softmax and then apply the function
+                auto logits_val = cache[logits];
+                auto true_val = cache[tru];
+
+                EigVec<ScalarType> softmaxed = (logits_val.array() - logits_val.maxCoeff()).exp().matrix();
+                softmaxed /= softmaxed.sum();
+                const ScalarType scalar_loss = -(true_val.array() * (softmaxed.array() + eps).log()).sum();
+                EigVec<ScalarType> scalar(1);
+                scalar(0) = scalar_loss;
+                cache[node] = scalar;
+                break;
+            }
+            case ExpressionType::SoftMax: {
+                auto* logits = node->get_children()[0];
+                auto logits_val = cache[logits];
+                EigVec<ScalarType> softmaxed = (logits_val.array() - logits_val.maxCoeff()).exp().matrix();
+                softmaxed /= softmaxed.sum();
+                cache[node] = softmaxed;
                 break;
             }
             case ExpressionType::ScalarPower: {
                 auto* a = node->get_children()[0];
                 EigVec<ScalarType> scalar(1);
-                std::cout << "prendo " << cache[a](0) << "ediventa " << std::pow(cache[a](0), node->get_pow());
                 scalar(0) = std::pow(cache[a](0), node->get_pow());
                 cache[node] = scalar;
-                std::cout << " ALLA FINE: " << scalar <<  " e " << cache[node] << node;
                 break;
             }
             case ExpressionType::LpNorm: {
@@ -751,9 +777,7 @@ namespace autograd {
                 auto norm = MathOps::lp_norm(cache[a], node->get_p_norm());
                 auto p = node->get_p_norm();
                 if (node->get_p_norm() == 2) {
-                    std::cout << "triggered:"; 
                     cache[node] = cache[a] / norm;
-                    std::cout << cache[node];
                 }
                 else if (node->get_p_norm() == 1) {
                     cache[node] = cache[a].array().sign();
@@ -765,7 +789,6 @@ namespace autograd {
             }
         }
         result = cache[root];
-        std::cout << "THE RESULT IS: " << result << std::endl;
         return result;
     }
 
@@ -814,7 +837,6 @@ namespace autograd {
                 }
             }
             else {
-                std::cout << "Pronto!" << std::endl;
                 // Pseudo evaluation of the node.
                 node_ordering.push_back(node);
                 cache.insert(node);
@@ -840,9 +862,7 @@ namespace autograd {
             // Compute now the topological ordering required for non-recursive
             // evaluation. 
             evaluate_graph_non_recursive_ordering(expr, this->eval_ordering);
-            for (int i = 0; i < eval_ordering.size(); ++i)
-                std::cout << eval_ordering[i] << " ";
-            std::cout << std::endl;
+
         }
 
         ExpressionNode* expr() {
@@ -937,9 +957,7 @@ namespace autograd {
             root = expr;
             // This compiles the expression into a well defined evaluation ordering.
             evaluate_graph_non_recursive_ordering(expr, this->eval_ordering);
-            for (int i = 0; i < eval_ordering.size(); ++i)
-                std::cout << eval_ordering[i] << " ";
-            std::cout << std::endl;
+
             // Compute now the topological ordering required for non-recursive
             // evaluation. 
             return *this;

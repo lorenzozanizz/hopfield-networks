@@ -112,12 +112,9 @@ public:
         }
         if (do_plot) {
             // Plot the norm of the reservoir and all the rest.
-            std::cout << "hey!";
             for (const auto& pair : nvc) {
-                std::cout << "hey!";
                 if (!pair.second.size())
                     continue;
-                std::cout << " continue";
                 auto ctx = plotter->context();
                 ctx.set_title("Evolution of " + pair.first).
                     set_x_label("Iteration steps").plot_sequence(pair.second);
