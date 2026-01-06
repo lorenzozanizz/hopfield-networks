@@ -1,32 +1,30 @@
 #include <cstdio>
 #include <memory>
+#include <thread>
 #include <iostream>
 
 // Hopfield networks
-
 #include "hopfield/states/binary.hpp"
 #include "hopfield/deterministic/dense_hopfield_network.hpp"
 #include "hopfield/stochastic/stochastic_hopfield_network.hpp"
 #include "hopfield/deterministic/cross_talk_visualizer.hpp"
 #include "hopfield/logger/logger.hpp"
 
-
-
 // Reservoir computing
-
 #include "math/autograd/variables.hpp"
 #include "reservoir/reservoir.hpp"
 #include "reservoir/reservoir_predictor.hpp"
 #include "reservoir/reservoir_logger.hpp"
-
-
 
 // Konohen mappings
 #include "mappings/konohen_mapping.hpp"
 #include "mappings/classifier/majority_mapping.hpp"
 
 // Restricted Boltzmann machines
+#include "boltzmann/restricted_boltzmann_machine.hpp"
+#include "boltzmann/boltzmann_logger.hpp"
 
+// Io routines
 #include "io/plot/plot.hpp"
 #include "io/gif/gif.hpp"
 #include "io/image/images.hpp"
@@ -94,6 +92,8 @@ hopfield_compile() {
 	Image img1_r(img1, Channels::Greyscale);
 	{ p.context().show_image(img1_r); }
 
+	VectorDataset<std::vector<unsigned char>, unsigned int> mnist(100);
+	DatasetRepo::load_mnist_vector("C:/Users/picul/Documents/MNIST/vector_mnist.data", 100, mnist);
 
 	StateUtils::load_state_from_image(bs1, img1_r,  /* binarize */ true);
 
@@ -179,6 +179,7 @@ konohen_compile() {
 
 void 
 reservoir_compile() {
+
 	Reservoir<float> reservoir(10, 30);
 	ReservoirLogger<float> logger;
 
@@ -304,6 +305,9 @@ reservoir_compile() {
 	}
 	*/
 
+	VectorDataset<Eigen::VectorXf, Eigen::VectorXf> ecg_series(100);
+	DatasetRepo::load_mit_bih( "nowhere", 100, ecg_series);
+
 	VectorDataset<Eigen::VectorXf, Eigen::VectorXf> sine_series(100);
 	DatasetRepo::load_sine_time_series<float>(/* amount */300, sine_series);
 	
@@ -336,6 +340,27 @@ reservoir_compile() {
 void 
 boltzmann_compile() {
 
+	using namespace Eigen;
+
+	Plotter p;
+
+	RestrictedBoltzmannMachine<float> machine(64*64, 100);
+	machine.initialize_weights(0.01);
+
+	VectorCollection<VectorXf>  dataset(1000);
+	DatasetRepo::load_real_faces_128("archive_reduced", 1000, dataset);
+
+	std::cout << "Loaded the dataset!" <<  dataset.size() << std::endl;
+
+	machine.train_cd(10, dataset, 25, 0.05, 10);
+	
+	for (int i = 0; i < 8; ++i) {
+		machine.random_visible();
+		machine.run_cd_k(5, i % 2);
+		machine.plot_state(p, 64, 64);
+	}
+
+	p.block();
 }
 
 void
@@ -783,6 +808,9 @@ void classification_test() {
 
 // Just create the folder...
 int main() {
+
+	Eigen::initParallel();
+	Eigen::setNbThreads(std::thread::hardware_concurrency());
 	// classification_test();
 
 	// autograd_compile();
@@ -790,8 +818,9 @@ int main() {
 	autograd_compile();
 	io_utils_compile();
 	*/
+	boltzmann_compile();
 	// reservoir_compile();
-	hopfield_compile();
+	// hopfield_compile();
 
 }
 	

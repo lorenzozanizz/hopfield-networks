@@ -55,7 +55,6 @@ const ActivationFunction<DataType> Activations<DataType>::sigmoid = {
     }
 };
 
-
 template <typename DataType>
 const ActivationFunction<DataType> Activations<DataType>::identity = {
     // f(x)

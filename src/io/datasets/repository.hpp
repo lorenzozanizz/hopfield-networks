@@ -7,10 +7,12 @@
 #include <string>
 #include <sstream>
 #include <stdexcept>
-#include <iostream> 
+#include <iostream>
+#include <filesystem>
 #include <cmath>
 #include <fstream>
 
+#include "../image/images.hpp"
 #include "dataset.hpp"
 #include "data_collection.hpp"
 #include "../../math/matrix/matrix_ops.hpp"
@@ -78,7 +80,7 @@ namespace DatasetRepo {
 	}
 
 	void load_mnist_vector(
-		std::string& path,
+		std::string path,
 		unsigned int amount,
 		VectorDataset<std::vector<unsigned char>, unsigned int>& values
 	) {
@@ -167,7 +169,97 @@ namespace DatasetRepo {
 		return;
 	}
 
+	template <typename FloatingType>
+	void load_mit_bih(
+		const std::string& path,
+		unsigned int amount,
+		VectorDataset<FloatVector<FloatingType>, FloatVector<FloatingType>>& entries) {
+		// Load the CV, compute the one-hot representation of classes. 
+		// See the Keggle page 
+		// https://www.kaggle.com/datasets/josegarciamayen/mit-bih-arrhythmia-dataset-preprocessed?resource=download
 
+		entries.reserve(amount);
+
+		// These are also fixed, see the above link
+		constexpr const auto measurement_width = 187;
+		constexpr const auto num_categories = 5; 
+
+		std::ifstream file(path);
+		std::string line;
+		FloatVector<FloatingType> vector(measurement_width);
+		FloatVector<FloatingType> one_hot(num_categories);
+		unsigned int line_no = 1;
+
+		while (std::getline(file, line)) {
+			if (line.empty() || line.rfind("#", 0) == 0) continue;
+
+			one_hot.setZero();
+
+			std::stringstream ss(line);
+			std::string cell;
+			std::vector<std::string> row;
+
+			while (std::getline(ss, cell, ',')) {
+				row.push_back(cell);
+			}
+			for (int i = 0; i < measurement_width; ++i )
+				vector(i) = FloatingType( std::stof(row[i]) );
+			one_hot(std::stoi(row[row.size() - 1])) = FloatingType(1.0);
+
+			// Now we have read a CSV line into row, put it into a vector
+			// and load it into the dataset. 
+
+			entries.add_sample(vector, one_hot, line_no);
+			line_no++;
+		}
+		return;
+	}
+
+
+	template <typename FloatingType>
+	void load_real_faces_128(
+		const std::string folder,
+		unsigned int amount,
+		VectorCollection<FloatVector<FloatingType>>& into
+	) {
+		// Read the required amount of file names, then read all files. a bit corny,
+		// whatever!
+		into.reserve(amount);
+		using namespace std::filesystem;
+		// Path to names.txt
+		path names_file = path(folder) / "names.txt";
+
+		std::cout << "file: " << names_file << std::endl;
+		std::ifstream file(names_file);
+		if (!file.is_open()) {
+			throw std::runtime_error("Error: Could not open names file.");
+		}
+
+		std::string line;
+		int count = 1;
+
+		FloatVector<FloatingType> vector(64 * 64);
+
+		while (count <= amount && std::getline(file, line)) {
+			// Trim whitespace
+			if (line.empty()) continue;
+
+			// Build full path to the image
+			path img_path = path(folder) / line;
+
+			// Load image
+			Image image(img_path, Channels::Greyscale);
+			ImageUtils::niblack_binarize(image, /* window */ 10);
+
+			auto raw_data = image.data();
+
+			for (int i = 0; i < image.width * image.height; ++i)
+				vector(i) = (raw_data[i] > 127)? FloatingType(1.0) : FloatingType(0.0) ;
+			into.add_sample(vector, /* id */ count);
+			count++;
+		}
+
+	}
 }
 
 
