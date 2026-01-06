@@ -129,37 +129,42 @@ namespace ImageUtils {
 
 	}
 
-	void threshold_binarize(Image& img, unsigned char threshold=150) {
-		// Assumes that the image binary is an image with a greyscale channel. 
-		if (img.channels != 1)
-			throw std::invalid_argument("Failed to binarize the required image: not black and white");
-		const unsigned long long dim = img.width * img.height;
-		unsigned char* d = img.data();
+	void threshold_binarize(unsigned char* img, unsigned int width, unsigned int height,
+		unsigned char threshold = 150) {
+		const unsigned long long dim = width * height;
+		unsigned char* d = img;
 		for (int i = 0; i < dim; ++i) {
 			if (d[i] > threshold)
 				d[i] = 255;
 			else
 				d[i] = 0;
 		}
-		return; 
+		return;
 	}
 
-	void background_aware_binarize(Image& img) {
+	void threshold_binarize(Image& img, unsigned char threshold=150) {
+		// Assumes that the image binary is an image with a greyscale channel. 
+		if (img.channels != 1)
+			throw std::invalid_argument("Failed to binarize the required image: not black and white");
+		const unsigned long long dim = img.width * img.height;
+		unsigned char* d = img.data();
+		threshold_binarize(d, img.width, img.height, threshold);
+	}
+
+	void background_aware_binarize(unsigned char* img, unsigned int width, unsigned int height) {
 		// A simple naive implementation of Otsu's method 
 		// https://en.wikipedia.org/wiki/Otsu%27s_method
 		// to binarize the image. This is less naive than a threshold binarization. 
 
 		// This is thread safe but uses 4*256 = 1kb of stack 
-		/* static */ int hist[256] = {0};
+		/* static */ int hist[256] = { 0 };
 
 		// Assumes that the image binary is an image with a greyscale channel. 
-		if (img.channels != 1)
-			throw std::invalid_argument("Failed to binarize the required image: not black and white");
 
-		const unsigned long long dim = img.width * img.height;
-		unsigned char* d = img.data();
+		const unsigned long long dim = width * height;
+		unsigned char* d = img;
 		// Compute the pixel intensity histogram required for otsu's algorithm
-		for (int i = 0; i < dim; ++i) 
+		for (int i = 0; i < dim; ++i)
 			hist[d[i]]++;
 
 		double sum1 = 0, sumB = 0;
@@ -186,7 +191,25 @@ namespace ImageUtils {
 			sumB += (ii)*hist[ii];
 		}
 		// Use the computed estimate of Otsu's threshold to binarize the image. 
-		threshold_binarize(img, level);
+		threshold_binarize(img, width, height, level);
+		return;
+	}
+
+	void background_aware_binarize(Image& img) {
+		// A simple naive implementation of Otsu's method 
+		// https://en.wikipedia.org/wiki/Otsu%27s_method
+		// to binarize the image. This is less naive than a threshold binarization. 
+
+		// This is thread safe but uses 4*256 = 1kb of stack 
+		/* static */ int hist[256] = {0};
+
+		// Assumes that the image binary is an image with a greyscale channel. 
+		if (img.channels != 1)
+			throw std::invalid_argument("Failed to binarize the required image: not black and white");
+
+		const unsigned long long dim = img.width * img.height;
+		unsigned char* d = img.data();
+		background_aware_binarize(d, img.width, img.height);
 		return;
 	}
 

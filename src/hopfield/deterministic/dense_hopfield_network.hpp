@@ -22,7 +22,7 @@ public:
 	DenseHopfieldNetwork(state_size_t size) : BaseHopfield<WeightingPolicy>(size) 
 	{ }
 
-	void run(const BinaryState& init_state,
+	void run(
 		const unsigned long iterations,
 		const UpdateConfig uc 
 		// ^Describe whether we have asyncronous, synchronous or group updates.
@@ -42,10 +42,6 @@ public:
 			local_fields_out.resize(uc.group_size);
 			update_indexes.resize(uc.group_size);
 		}
-
-		// Copy the content of the initial state. The strides are left untouched, they represent
-		// how the logging routines interpret the data. 
-		this->binary_state.copy_content(init_state);
 
 		auto schedule = this->fix_computation_schedule();
 		if (schedule.do_order_parameter && this->ref_state.size() == 0)

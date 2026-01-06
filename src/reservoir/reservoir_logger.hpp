@@ -41,7 +41,7 @@ class ReservoirLogger {
 
 public:
 
-    ReservoirLogger() : record_norm(false), record_state(false) { }
+    ReservoirLogger() : record_norm(false), record_state(false), do_plot(false) { }
 	
     void assign_plotter(Plotter* plot) {
         plotter = plot;
@@ -94,6 +94,7 @@ public:
 
             this->update_logger_buffer(begin_state, /* reset = */ true);
             gio.write_frame(log_buf.write_buffer.get());
+
         }
         if (record_norm) {
             // Ensure the file stream is ok

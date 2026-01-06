@@ -4,11 +4,13 @@
 
 #include <vector>
 #include <functional>
+#include <optional>
 #include <random>
 
 // To collect and plot information about the loss functions
 #include "../io/plot/plot.hpp"
 #include "../io/datasets/data_collection.hpp"
+#include "../io/datasets/dataset.hpp"
 
 // To compute the loss gradient automatically.
 #include "../math/autograd/variables.hpp"
@@ -36,6 +38,8 @@ public:
     static const ActivationFunction<DataType> sigmoid;
     static const ActivationFunction<DataType> tanh;
     static const ActivationFunction<DataType> relu;
+    static const ActivationFunction<DataType> identity;
+
 };
 
 template <typename DataType>
@@ -48,6 +52,19 @@ const ActivationFunction<DataType> Activations<DataType>::sigmoid = {
     [](const Matrix& x) -> Matrix {
         auto s = (1.0 / (1.0 + (-x.array()).exp()));
         return (s * (1.0 - s)).matrix();
+    }
+};
+
+
+template <typename DataType>
+const ActivationFunction<DataType> Activations<DataType>::identity = {
+    // f(x)
+    [](const Matrix& x) -> Matrix {
+        return x;
+    },
+    // df(x)
+    [](const Matrix& x) -> Matrix {
+        return Matrix::Ones(x.rows(), x.cols());
     }
 };
 
@@ -121,8 +138,17 @@ public:
         return A[num_layers - 1];
     }
 
+    unsigned int input_size() const {
+        return layer_sizes[0];
+    }
+    
+    unsigned int output_size() const {
+        return layer_sizes[num_layers - 1];
+    }
+
     void backward(const Matrix& dLoss_dA_L) {
         int batch_size = dLoss_dA_L.cols();
+
 
         // Output layer delta
         delta[num_layers - 1] =
@@ -140,6 +166,7 @@ public:
             dW[l] = (delta[l] * A[l - 1].transpose()) / batch_size;
             db[l] = delta[l].rowwise().mean();
         }
+
     }
 
     // SGD update, the batch normalization factor is absorbed by the learning
@@ -173,7 +200,7 @@ private:
             int cols = layer_sizes[l - 1];
             // We use a glorot kind initialization strategy so that the weights
             // are zero-mean normal with std_dev given by 1/sqrt(input size)
-            float stddev = 1.0f / std::sqrt(layer_sizes[l - 1]);
+            float stddev = 2.0f / std::sqrt( rows + cols );
             std::normal_distribution<DataType> dist(0.0, stddev);
 
             W[l].resize(rows, cols);
@@ -193,6 +220,9 @@ private:
 template <typename DataType>
 class NetworkTrainer {
 
+    using Matrix = Eigen::Matrix< DataType, Eigen::Dynamic, Eigen::Dynamic>;
+    // This is a COLUMN vector! otherwise eigen cries
+    using Vector = Eigen::Matrix< DataType, Eigen::Dynamic, 1>;
 
     using Network = MultiLayerPerceptron<DataType>;
     using LossFunction = autograd::ScalarFunction<DataType>;
@@ -200,49 +230,141 @@ class NetworkTrainer {
     using LastOutput = autograd::VectorVariable; 
 
     Network& network;
-    LossFunction& loss_function;
-  
+
+    LossFunction* loss_function;
     LossGradient gradient_generator;
+    autograd::EvalMap<float> loss_eval_map;
+
+    LastOutput layer_variable;
+    LastOutput ground_truth_variable;
 
     bool record_loss;
     bool record_verif_loss;
 
+    // To contain information obtained during the training.
+    NamedVectorCollection<DataType> nvc;
+
 public:
 
-    NetworkTrainer( Network& network ): network(network)
-    { }
+    NetworkTrainer( Network& network ): network(network), record_loss(false),
+        record_verif_loss(false), loss_function(nullptr) {
+        nvc.clear();
+    }
 
-    void set_loss_function(LossFunction& loss) {
+    void set_loss_function(LossFunction* loss, LastOutput var, LastOutput ground_truth) {
         loss_function = loss;
+        loss_function->derivative(gradient_generator, var);
+        layer_variable = var;
+        ground_truth_variable = ground_truth;
     }
 
-    void setup_autograd(LastOutput var) {
-        loss_function.derivative(var, gradient_generator);
+    void feed_additional_loss_variables(autograd::VectorVariable var, Vector& vector) {
+        loss_eval_map.emplace(var, vector);
     }
 
-    void feed_additional_loss_variables() {
-
-    }
-
+    using VectorType = Eigen::Matrix<DataType, Eigen::Dynamic, 1>;
+    using Dataset = VectorDataset< VectorType, VectorType >;
     // Avoid something fancy like a generator expression for the 
     // datasets to avoiding the handling of too much data at once, even though
     // it would be a good idea in principle. 
-    void train() {
+    void train(
+        // The dataset
+        unsigned int epochs,
+        Dataset& data,
+        // An optional verification dataset
+        std::optional< std::reference_wrapper<Dataset> > verification_data,
+        unsigned int batch_size,
+        double lr
+    ) {
+
+        using namespace Eigen;
+        if (data.size() < batch_size)
+            throw std::runtime_error("Batch size too large for the dataset!");
+        if (record_verif_loss && !verification_data)
+            throw std::runtime_error("Cannot log the verification data, no verification dataset was provided!");
+
+        // Declare all the batch memory here to avoid reallocation
+        Matrix batch_input(network.input_size(), batch_size);
+        Matrix batch_gradient(network.output_size(), batch_size);
+        Matrix batch_output(network.output_size(), batch_size);
+
+        for (unsigned int epoch = 0; epoch < epochs; ++epoch)
+        {
+            data.shuffle();
+            // For each epoch perform the following train iteration. 
+            for (auto batch : data.batches(batch_size)) {
+                // First we build the batched input matrix (Note that the i iterations are
+                // batch local indices, not global indices!)
+                for (size_t i = 0; i < batch.size(); ++i) {
+                    batch_input.col(i) = batch.x_of(i);
+                }
+                batch_output = network.forward(batch_input);
+                // Then we construct the batched gradient matrix
+                for (size_t i = 0; i < batch.size(); ++i) {
+                    VectorType out_col = batch_output.col(i);
+                    VectorType true_col = batch.y_of(i);
+                    loss_eval_map.clear();
+
+                    loss_eval_map.emplace(layer_variable, out_col);
+                    loss_eval_map.emplace(ground_truth_variable, true_col);
+                    gradient_generator(loss_eval_map, batch_gradient.col(i));
+                }
+                // We then perform backpropagation 
+                network.backward(batch_gradient);
+
+                // And apply the gradient (averaged, so no lr/batch)
+                network.apply_gradients( lr );
+            }
+            // These are logging routines to aid with training
+
+            if (record_loss) {
+                notify_loss( compute_loss_over_dataset( data) );
+            }
+            if (record_verif_loss) {
+                notify_verification_loss( compute_loss_over_dataset( *verification_data ) );
+            }
+        }
+
+        network.apply_gradients(lr);
+    }
+
+    void notify_loss(double loss) {
+
+    }
+
+    void notify_verification_loss(double loss) {
 
     }
 
     void do_log_loss(bool value) {
         record_loss = value;
+        if (value)
+            nvc.register_name("Loss");
     }
 
     void do_log_verification_loss(bool value) {
         record_verif_loss = true;
+        if (value)
+            nvc.register_name("Verification loss");
     }
 
     void plot_loss(Plotter& plotter) {
+        if (record_loss || record_verif_loss) {
 
+        }
     }
 
+protected:
+
+    double compute_loss_over_dataset(Dataset& data) {
+        // Use the current state of the weights to compute the loss
+        double total_loss = 0.0;
+        const auto n_size = data.size();
+        for (int i = 0; i < n_size; ++i) {
+            loss_eval_map.clear();
+        }
+        return 1 / n_size;
+    }
 
 };
 

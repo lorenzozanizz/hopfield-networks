@@ -291,8 +291,6 @@ namespace autograd {
             return pow(lp, 2);
         }
 
-
-    
         void dealloc_all() {
             nodes.clear();
         }
@@ -390,6 +388,8 @@ namespace autograd {
         case ExpressionType::VectorScalarMultiply: return "VectorScalarMul";
         case ExpressionType::Constant: return "Const";
         case ExpressionType::Zero: return "Zero";
+        case ExpressionType::SoftMax: return "SoftMax";
+        case ExpressionType::SoftMaxCrossEntropy: return "SoftMaxCrossEntropy";
         case ExpressionType::ScalarPower: return "Pow";
         case ExpressionType::Identity: return "Identity";
         case ExpressionType::LpNorm: return "LpNorm";
@@ -497,7 +497,6 @@ namespace autograd {
             auto* der = cache[root];
             // Perform all possible optimizations on the graph. 
             unsigned int performed_opts;
-            print_as_binary_tree(der);
             do {
                 performed_opts = 0;
                 optimize(der, gen, performed_opts);
@@ -869,12 +868,12 @@ namespace autograd {
             return root;
         }
 
-        void operator() (EvalMap<ScalarType>& eval_data, EigVec<ScalarType>& vec) {
+        void operator() (EvalMap<ScalarType>& eval_data, Eigen::Ref<EigVec<ScalarType>> vec) {
             // See the notes  inside apply
             return apply(eval_data, vec);
         }
 
-        void apply(EvalMap<ScalarType>& eval_data, EigVec<ScalarType>& vec) {
+        void apply(EvalMap<ScalarType>& eval_data, Eigen::Ref<EigVec<ScalarType>> vec) {
             if (root == nullptr) {
                 throw std::runtime_error("VectorFunction has no root expression");
             }
