@@ -48,7 +48,6 @@ public:
 	}
 
 	void run(
-		const BinaryState& init_state,
 		const unsigned long iterations,
 		std::unique_ptr<AnnealingScheduler> temp_sched,
 		// Our annealing scheduling policy. 
@@ -69,10 +68,6 @@ public:
 			local_fields_out.resize(uc.group_size);
 			update_indexes.resize(uc.group_size);
 		}
-
-		// Copy the content of the initial state. The strides are left untouched, they represent
-		// how the logging routines interpret the data. 
-		this->binary_state.copy_content(init_state);
 
 		auto schedule = this->fix_computation_schedule();
 		if (schedule.do_order_parameter && this->ref_state.size() == 0)

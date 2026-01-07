@@ -13,6 +13,7 @@
 #include "../../io/image/images.hpp"
 #include "../../io/plot/plot.hpp"
 #include "../../io/io_utils.hpp"
+#include "../../math/matrix/matrix_ops.hpp"
 
 // A simple class to contain a binary state, with the obvious optimization of using a 
 // binary string to contain the -1/1 pair of values. This reduces storage by a factor 
@@ -59,6 +60,16 @@ public:
 		size = ref.size;
 
 		return *this;
+	}
+
+	// Copy constructor
+	BinaryState(const BinaryState& ref) {
+		raw_data.reset(new unsigned char[ref.byte_size()]);
+		memcpy(raw_data.get(), ref.data(), ref.byte_size());
+
+		stride_y = ref.stride_y;
+		stride_z = ref.stride_z;
+		size = ref.size;
 	}
 
 	void copy_content(const BinaryState& ref) {
@@ -217,6 +228,8 @@ public:
 
 	};
 
+	double agreement_score(const BinaryState& other) const ;
+
 	BinaryStateIterator begin() const {
 		return BinaryStateIterator(*this, 0);
 	}
@@ -262,7 +275,6 @@ namespace StateUtils {
 	void load_state_from_stream(std::istream& input, BinaryState& bs) {
 		// Load the state from an input stream (e.g. stdin or a file)
 		// Assume a human readable format ('1' and '0' instead of binary string
-
 	}
 
 	void load_state_from_byte_array(BinaryState& bs, const unsigned char* raw_data, const state_size_t sz,
@@ -310,7 +322,6 @@ namespace StateUtils {
 		load_state_from_byte_array(bs, img.data(), bs.get_size());
 	}
 
-
 	void load_state_from_image(BinaryState& bs, const std::string& img, bool do_binarize = false) {
 		// Force the channels to be binary. 
 		Image image(img, Channels::Greyscale);
@@ -340,7 +351,6 @@ namespace StateUtils {
 
 		}
 	}
-
 
 	void write_state_as_byte_array(BinaryState& bs, unsigned char*& raw_data,
 		unsigned char low_value = 0, unsigned char high_value = 255) {
@@ -384,6 +394,11 @@ namespace StateUtils {
 
 		
 } // end namespace StateUtils
+
+double BinaryState::agreement_score(const BinaryState& other) const {
+	auto distance = StateUtils::hamming_distance(*this, other);
+	return std::abs((double) distance - get_size()) / get_size();
+}
 
 std::ostream& operator<<(std::ostream& os, const BinaryState& ref) {
 	// Write the binary stream into the output stream. Should be easily read into

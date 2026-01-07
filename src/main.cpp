@@ -1,25 +1,20 @@
 #include <cstdio>
 #include <memory>
+#include <thread>
 #include <iostream>
 
 // Hopfield networks
-
 #include "hopfield/states/binary.hpp"
 #include "hopfield/deterministic/dense_hopfield_network.hpp"
 #include "hopfield/stochastic/stochastic_hopfield_network.hpp"
 #include "hopfield/deterministic/cross_talk_visualizer.hpp"
 #include "hopfield/logger/logger.hpp"
 
-
-
 // Reservoir computing
-
 #include "math/autograd/variables.hpp"
 #include "reservoir/reservoir.hpp"
 #include "reservoir/reservoir_predictor.hpp"
 #include "reservoir/reservoir_logger.hpp"
-
-
 
 // Konohen mappings
 #include "mappings/konohen_mapping.hpp"
@@ -27,13 +22,18 @@
 #include "mappings/clustering/u_clustering.hpp"
 
 // Restricted Boltzmann machines
+#include "boltzmann/restricted_boltzmann_machine.hpp"
+#include "boltzmann/boltzmann_logger.hpp"
 
+// Io routines
 #include "io/plot/plot.hpp"
 #include "io/gif/gif.hpp"
 #include "io/image/images.hpp"
 #include "io/datasets/dataset.hpp"
+#include "io/datasets/repository.hpp"
 
-
+#include <cfenv> 
+#pragma STDC FENV_ACCESS ON
 
 enum NeighbouringStrategy {
 	OneDNeighbouring,
@@ -93,6 +93,8 @@ hopfield_compile() {
 	Image img1_r(img1, Channels::Greyscale);
 	{ p.context().show_image(img1_r); }
 
+	VectorDataset<std::vector<unsigned char>, unsigned int> mnist(100);
+	DatasetRepo::load_mnist_vector("C:/Users/picul/Documents/MNIST/vector_mnist.data", 100, mnist);
 
 	StateUtils::load_state_from_image(bs1, img1_r,  /* binarize */ true);
 
@@ -144,8 +146,19 @@ hopfield_compile() {
 	dhn.add_reference_state(bs1_orig);
 	dhn.add_reference_state(bs2);
 	dhn.add_reference_state(bs3);
-	dhn.run(bs1, 200, uc);
+
+	dhn.feed(bs1);
+	dhn.run( 200, uc);
 	dhn.detach_logger(&logger);
+
+	HopfieldClassifier classifier;
+	classifier.put_mapping(bs1_orig, 1);
+	classifier.put_mapping(bs2, 2);
+
+	dhn.attach_classifier(&classifier);
+	auto cls = dhn.classify();
+	if (cls)
+		std::cout << "Classificazione: " << std::get<1>(*(dhn.classify()));
 
 	HebbianCrossTalkTermVisualizer cttv(p, 40*40);
 	std::cout << "Devo calcola" << std::endl;
@@ -153,12 +166,6 @@ hopfield_compile() {
 	cttv.compute_cross_talk_view(bs1, { &bs2, &bs3 });
 	std::cout << "Devo showa" << std::endl;
 	cttv.show(40, 40);
-
-	{
-		auto ctx = p.context();
-		std::vector<int> a = { 0, 0, 1, 1, 2, 2, 3, 3 , 4};
-		ctx.show_discrete_categories(a, 3, 3, 5);
-	}
 
 
 	p.block();
@@ -173,19 +180,21 @@ konohen_compile() {
 
 void 
 reservoir_compile() {
-	Reservoir<float> reservoir(10, 400);
+
+	Reservoir<float> reservoir(10, 30);
 	ReservoirLogger<float> logger;
 
 	reservoir.attach_logger(&logger);
 
+
 	reservoir.initialize_echo_weights(0.1, SamplingType::Uniform);
 	reservoir.initialize_input_weights(SamplingType::Normal);
 
+
 	Plotter p;
 	logger.set_collect_norm(true);
-	logger.set_collect_states(true, "res_states.gif", 20, 20);
-	logger.finally_plot(true);
-	logger.assign_plotter(&p);
+	logger.set_collect_states(true, "res_states.gif", 6, 6);
+	// logger.assign_plotter(&p);
 
 	Eigen::VectorXf input(10);
 	input(1) = 0.4;
@@ -195,16 +204,164 @@ reservoir_compile() {
 	reservoir.begin_run();
 	reservoir.feed(input);
 	for (int i = 0; i < 20; ++i) {
-		reservoir.run();
+		reservoir.run(); 
 	}
 	reservoir.end_run();
 
-	p.block();
+
+	// feenableexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW);
+
+	std::vector<int> units = { 30, 30, 10 };
+	auto sigmoid = Activations<float>::sigmoid;
+	auto identity = Activations<float>::identity;
+
+	std::vector<ActivationFunction<float>> acts = { sigmoid , sigmoid };
+
+	MultiLayerPerceptron<float> mlp(units, acts) ;
+	
+	Eigen::MatrixXf inputs(30, 4); 
+
+
+	using namespace autograd;
+
+	ScalarFunction loss_function;
+	auto& g = loss_function.generator();
+	auto y		= g.create_vector_variable(10);
+	auto y_hat  = g.create_vector_variable(10);
+	loss_function = g.squared_l2_norm(g.sub(y, y_hat));
+
+	EvalMap<float> map;
+	EigVec<float> vec(10);
+	vec.setZero();
+
+	EigVec<float> vec_ref(10);
+	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> batch_ref(10, 2);
+	vec_ref.setZero();
+	vec_ref(2) = 0.5;
+	vec_ref(1) = 0.5;
+
+	batch_ref.setZero();
+	batch_ref(2, 0) = 0.5;
+	batch_ref(1, 0) = 0.5;
+	batch_ref(3, 1) = 0.8;
+	batch_ref(1, 1) = 0.2;
+
+	EigVec<float> vec_input(30);
+	vec_input(10) = 3.0;
+
+	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> batch_input(30, 2);
+	batch_input(1, 1) = 1.0;
+	batch_input(10, 0) = 3.0;
+
+	// Eigen::MatrixXf out = mlp.forward(batch_input);
+	
+	// vec = out.col(0);
+
+	// map.emplace(y, vec);
+	// map.emplace(y_hat, vec_ref);
+
+	// std::cout << "Value of the loss : " << loss_function( map ) << std::endl;
+
+	VectorFunction deriv;
+	loss_function.derivative(deriv, y);
+	
+	// std::cout << loss_function;
+
+	// std::cout << deriv;
+
+	// Eigen::VectorXf loss_grad(10);
+	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> batch_grad(10, 2);
+
+	Eigen::MatrixXf out = mlp.forward(batch_input);
+
+	EigVec<float> out_col = out.col(0);
+	EigVec<float> true_col = batch_ref.col(0);
+	map.clear();
+
+	map.emplace(y, out_col);
+	map.emplace(y_hat, true_col);
+
+	auto loss = loss_function(map);
+	std::cout << "LOSS INITIALLY: " << loss;
+
+	/*
+	for (int i = 0; i < 20; ++i) {
+		
+		Eigen::MatrixXf out = mlp.forward(batch_input);
+
+		for (int batch = 0; batch < 2; ++batch) {
+			// auto grad_col = batch_grad.col(batch); 
+			// auto out_col = out.col(batch);
+			EigVec<float> out_col = out.col(batch);
+			EigVec<float> true_col = batch_ref.col(batch);
+			map.clear();
+
+			map.emplace(y, out_col);
+			map.emplace(y_hat, true_col);
+			deriv(map, batch_grad.col(batch));
+		}
+
+		mlp.backward(batch_grad);
+		mlp.apply_gradients(0.2);
+	}
+	*/
+
+	VectorDataset<Eigen::VectorXf, Eigen::VectorXf> ecg_series(100);
+	DatasetRepo::load_mit_bih( "nowhere", 100, ecg_series);
+
+	VectorDataset<Eigen::VectorXf, Eigen::VectorXf> sine_series(100);
+	DatasetRepo::load_sine_time_series<float>(/* amount */300, sine_series);
+	
+	NetworkTrainer<float> trainer ( mlp ) ;
+	trainer.set_loss_function(& loss_function, y, y_hat);
+
+	trainer.train(
+		100,
+		sine_series,
+		std::nullopt, // no verification dataset
+		5,
+		0.04 //alpha
+	);
+
+	out = mlp.forward(batch_input);
+
+	out_col = out.col(0);
+	true_col = batch_ref.col(0);
+	map.clear();
+
+	map.emplace(y, out_col);
+	map.emplace(y_hat, true_col);
+
+	loss = loss_function(map);
+	std::cout << "LOSS finally: " << loss;
+
+
 }
 
 void 
 boltzmann_compile() {
 
+	using namespace Eigen;
+
+	Plotter p;
+
+	RestrictedBoltzmannMachine<float> machine(64*64, 100);
+	machine.initialize_weights(0.01);
+
+	VectorCollection<VectorXf>  dataset(1000);
+	DatasetRepo::load_real_faces_128("archive_reduced", 1000, dataset);
+
+	std::cout << "Loaded the dataset!" <<  dataset.size() << std::endl;
+
+	machine.train_cd(10, dataset, 25, 0.05, 10);
+	
+	for (int i = 0; i < 8; ++i) {
+		machine.random_visible();
+		machine.run_cd_k(5, i % 2);
+		machine.plot_state(p, 64, 64);
+	}
+
+	p.block();
 }
 
 void
@@ -723,14 +880,16 @@ void clustering_test() {
 // Just create the folder...
 int main() {
 
-	//clustering_test();
-	//classification_test();
+	Eigen::initParallel();
+	Eigen::setNbThreads(std::thread::hardware_concurrency());
+	// classification_test();
 
 	// autograd_compile();
-	
-	//autograd_compile();
-	//io_utils_compile();
-	//reservoir_compile();
+	/*
+	autograd_compile();
+	io_utils_compile();
+	*/
+	reservoir_compile();
 	// hopfield_compile();
 
 }

@@ -5,7 +5,11 @@
 #include <stdexcept>
 #include <iostream>
 #include <cmath>
+#include <fstream>
 
+
+#define EIGEN_USE_THREADS 
+#define EIGEN_DONT_PARALLELIZE 0
 #include <Eigen/Core>
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -107,6 +111,35 @@ namespace MathOps {
         return (T(0) < val) - (val < T(0));
     }
 
+    template <typename MatrixType>
+    void save_matrix_binary(const std::string& filename, const MatrixType& M) {
+        std::ofstream out(filename, std::ios::binary);
+        if (!out) throw std::runtime_error("Could not open file for writing");
+
+        int rows = M.rows();
+        int cols = M.cols();
+
+        out.write(reinterpret_cast<char*>(&rows), sizeof(int));
+        out.write(reinterpret_cast<char*>(&cols), sizeof(int));
+        out.write(reinterpret_cast<const char*>(M.data()),
+            sizeof(typename MatrixType::Scalar) * rows * cols);
+    }
+
+    template <typename MatrixType>
+    void load_matrix_binary(const std::string& filename, MatrixType& M) {
+        std::ifstream in(filename, std::ios::binary);
+        if (!in) throw std::runtime_error("Could not open file for reading");
+
+        int rows, cols;
+        in.read(reinterpret_cast<char*>(&rows), sizeof(int));
+        in.read(reinterpret_cast<char*>(&cols), sizeof(int));
+
+        M.resize(rows, cols);
+        in.read(reinterpret_cast<char*>(M.data()),
+            sizeof(typename MatrixType::Scalar) * rows * cols);
+
+        return;
+    }
 }
 
 #endif

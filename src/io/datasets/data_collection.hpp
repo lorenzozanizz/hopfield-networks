@@ -7,12 +7,6 @@
 #include <iostream>
 
 template <typename DataType = float>
-class VectorCollection {
-
-
-};
-
-template <typename DataType = float>
 class NamedVectorCollection {
 
 	std::map<std::string, std::vector<DataType>> mapped_data;
@@ -118,11 +112,6 @@ namespace DataUtils {
 		std::ifstream file_stream(file_name);
 		read_named_data_from_file(file_stream, ndc);
 		file_stream.close();
-	}
-
-	template <typename DataType>
-	void read_data_collection_from_file(const std::string& file_name, VectorCollection< DataType>& ndc) {
-
 	}
 
 }

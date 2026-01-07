@@ -5,11 +5,13 @@
 #include <algorithm>
 #include <vector>
 #include <functional>
+#include <optional>
 #include <iostream>
 #include <random>
 
 #include "../io/plot/plot.hpp"
 
+#include "classifier/hopfield_classifier.hpp"
 #include "states/binary.hpp"
 #include "network_types.hpp"
 #include "logger/logger.hpp"
@@ -47,6 +49,10 @@ protected:
 	std::vector<std::reference_wrapper<BinaryState>> ref_state;
 	std::vector<double> order_parameter_estimate;
 	double current_energy;
+
+	// A classifier that can be used in conjunction with the hopfield network to
+	// classify data. 
+	HopfieldClassifier* classifier; 
 
 public:
 
@@ -174,6 +180,28 @@ public:
 		for (auto* o : loggers) {
 			o->on_run_begin(bs, iterations);
 		}
+	}
+
+	void feed(BinaryState& init_state) {
+		// Copy the content of the initial state. The strides are left untouched, they represent
+		// how the logging routines interpret the data. 
+		this->binary_state.copy_content(init_state);
+	}
+
+	using Category = int;
+
+	void attach_classifier(HopfieldClassifier* classif) {
+		// Attach a classifier
+		classifier = classif;
+	}
+
+	// The first element of the pair is the binary state with the highest agreement, 
+	// category is its label.
+	auto classify() {
+		if (classifier == nullptr)
+			throw std::runtime_error("No classifier was specified for the Hopfield network!");
+		// Classify the network's own state. 
+		return classifier->classify(binary_state);
 	}
 
 };
