@@ -56,9 +56,10 @@ public:
 
 	void initialize_echo_weights(
 		double sparsity, // fraction of non-zero entries 
-		SamplingType sampling,
+		SamplingType sampling, // Note: I think that this variable is never used in this scope
 		unsigned long long seed = 0xcafebabe,
-		double spectral_radius_desired = 0.99
+		double spectral_radius_desired = 0.99 
+		// Note: I would point out in a comment that near 1 it is a long memory, < 1 is fading and > 1 is unstable
 	) {
 		using Trip = Eigen::Triplet<DataType>;
 		std::vector<Trip> triplets_vector;
@@ -87,7 +88,7 @@ public:
 
 		// Compress the echo matrix finalizing it, no further additions
 		// can be made. 
-		echo_weights.makeCompressed();
+		echo_weights.makeCompressed(); // Note: I don't understand what this function does and why are we using it
 	}
 	
 	void initialize_input_weights(
