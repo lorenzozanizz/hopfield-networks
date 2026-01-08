@@ -17,9 +17,15 @@
 #include "reservoir/reservoir_logger.hpp"
 
 // Konohen mappings
+/*
 #include "mappings/konohen_mapping.hpp"
 #include "mappings/classifier/majority_mapping.hpp"
 #include "mappings/clustering/u_clustering.hpp"
+*/
+
+#include "mappings/konohen_mapping_eigen.hpp"
+#include "mappings/classifier/majority_mapping_eigen.hpp"
+#include "mappings/clustering/u_clustering_eigen.hpp"
 
 // Restricted Boltzmann machines
 #include "boltzmann/restricted_boltzmann_machine.hpp"
@@ -30,6 +36,7 @@
 #include "io/gif/gif.hpp"
 #include "io/image/images.hpp"
 #include "io/datasets/dataset.hpp"
+#include "io/datasets/dataset_eigen.hpp"
 #include "io/datasets/repository.hpp"
 
 #include <cfenv> 
@@ -387,6 +394,7 @@ io_utils_compile() {
 
 }
 
+/*
 void 
 test_1D_neighbour_func() {
 	// Parameters
@@ -859,15 +867,7 @@ void clustering_test() {
 		}
 		data.push_back(std::move(vec));
 	}
-	/*
-	for (int i = 15; i < 20; ++i) {
-		auto vec = std::make_unique<double[]>(input_size);
-		for (int j = 0; j < input_size; ++j) {
-			vec[j] = 2 + i * 0.1;  // simple values: 0, 1.1, 2.2 etc
-		}
-		data.push_back(std::move(vec));
-	}*/
-
+	
 	km.train(data, iterations, nf, learning_rate);
 
 	UClustering<double> UMap(km, 0.4); 
@@ -876,12 +876,266 @@ void clustering_test() {
 	UMap.plot(plotter);
 
 }
+*/
+
+void
+test_2D_konohen_map_Eigen() {
+	// ----------------------
+  // Parameters
+  // ----------------------
+	unsigned int input_size = 3;       // each input vector has 3 features
+	unsigned int iterations = 400;
+	double learning_rate = 0.5;
+
+
+	// Parameters
+	double sigma0 = 2.0;
+	double tau = 10.0;
+	unsigned int map_width = 5;
+	unsigned int map_height = 3;
+	std::string evolving_func = "exponential";
+
+	// ----------------------
+	// Create map and neighborhood
+	// ----------------------
+	KonohenMapEigen<double> km(map_width, map_height, input_size);
+
+	// Create NeighbouringFunction
+	NeighbouringFunctionEigen nf(sigma0, tau, map_width, map_height, evolving_func);
+
+	// Set support size
+	nf.set_support_size(1);  // 2 neighbors on each side
+
+	std::cout << "\n\n\nInitializing\n\n\n";
+	// ----------------------
+	// Initialize weights
+	// ----------------------
+	km.initialize(42);
+	std::cout << "\n\n\nInitialized\n\n\n";
+
+
+	// Print initial weights
+	std::cout << "Initial weights:\n";
+	for (unsigned int k = 0; k < map_height; ++k) {
+		for (unsigned int i = 0; i < map_width; ++i) {
+			std::cout << "index " << i + k * map_width << "\n ";
+			std::cout << "Neuron (" << i << ", " << k << ")" << ": ";
+
+			for (unsigned int j = 0; j < input_size; ++j) {
+				std::cout << km.get_weights(i, k)(j) << " ";
+			}
+			std::cout << "\n";
+		}
+
+	}
+
+	// ----------------------
+// Create training data (5 Eigen vectors of size input_size)
+// ----------------------
+
+	std::cout << "\n\n\nStart creating training data\n\n\n";
+	std::vector<Eigen::VectorXd> data;
+	data.reserve(5);
+
+	for (int i = 0; i < 5; ++i) {
+		Eigen::VectorXd vec(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec(j) = 1 + j * 0.1;  // same values as before
+		}
+		data.push_back(vec);
+	}
+
+	std::cout << "\n\n\nStart training\n\n\n";
+	// ----------------------
+	// Train the map
+	// ----------------------
+	km.train(data, iterations, nf, learning_rate);
+
+	std::cout << "Ended training\n";
+	// ----------------------
+	// Display resulting weights
+	// ----------------------
+
+	std::cout << "\nTrained weights:\n";
+	for (unsigned int k = 0; k < map_height; ++k) {
+		for (unsigned int i = 0; i < map_width; ++i) {
+			std::cout << "index " << i + k * map_width << "\n ";
+			std::cout << "Neuron (" << i << ", " << k << ")" << ": ";
+			for (unsigned int j = 0; j < input_size; ++j) {
+				std::cout << km.get_weights(i + k * map_width)[j] << " ";
+			}
+			std::cout << "\n";
+		}
+
+	}
+}
+
+void classification_test_Eigen() {
+
+	// Parameters
+	unsigned int input_size = 2;       // each input vector has 3 features
+	unsigned int iterations = 300;
+	double learning_rate = 0.5;
+
+
+	// Parameters
+	double sigma0 = 2.0;
+	double tau = 10.0;
+	unsigned int map_width = 5;
+	unsigned int map_height = 3;
+	std::string evolving_func = "exponential";
+
+	// ----------------------
+	// Create map and neighborhood
+	// ----------------------
+	KonohenMapEigen<double> km(map_width, map_height, input_size);
+
+	// Create NeighbouringFunction
+	NeighbouringFunctionEigen nf(sigma0, tau, map_width, map_height, evolving_func);
+
+	// Set support size
+	nf.set_support_size(2);
+
+	km.initialize(42);
+
+	std::cout << "\n\n\nStart creating training data\n\n\n";
+	std::vector<Eigen::VectorXd> data;
+	data.reserve(10);
+
+	for (int i = 0; i < 10; ++i) {
+		Eigen::VectorXd vec(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec(j) = 1 + i * 0.1;  // same values as before
+		}
+		data.push_back(vec);
+	}
+
+	for (int i = 10; i < 20; ++i) {
+		Eigen::VectorXd vec(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec(j) = 55 + i * 0.1;  // same values as before
+		}
+		data.push_back(vec);
+	}
+
+	km.train(data, iterations, nf, learning_rate);
+
+	std::cout << "\n\n\n Trained \n\n\n";
+
+
+	std::map<int, std::string> labels_map;
+	labels_map[0] = "ones";
+	labels_map[1] = "fifties";
+
+	MajorityMappingEigen<double> classifier(km, 0.6, labels_map);
+
+	DatasetEigen<double, int> dataset(20); 
+	
+	for (int i = 0; i < 20; ++i) {
+		std::cout << " Data " << data[i]<<"\n\n";
+	}
+
+	for (int i = 0; i < 10; ++i) {
+		dataset.add_sample(data[i], 0);
+	}
+
+	for (int i = 10; i < 20; ++i) {
+		dataset.add_sample(data[i], 1);
+	}
+	std::cout << "\n\n\nClassifing\n\n\n";
+
+	classifier.classify(dataset);
+
+	std::cout << "\n\n\nClassified\n\n\n";
+
+	/*
+	for (unsigned int k = 0; k < map_height; ++k) {
+		for (unsigned int i = 0; i < map_width; ++i) {
+			std::cout << "index " << i + k * map_width << "\n ";
+			std::cout << "Neuron (" << i << ", " << k << ")" << ": ";
+			for (unsigned int j = 0; j < input_size; ++j) {
+				std::cout << km.get_weights(i + k * map_width)[j] << " ";
+			}
+			std::cout << "\n labeled as: ";
+			std::cout << classifier.label_for(i + k * map_width) << "\n\n";
+		}
+
+	}
+	*/
+	
+
+	Plotter plotter;
+	classifier.plot(plotter);
+
+}
+
+void clustering_test_eigen() {
+	// Parameters
+	unsigned int input_size = 10;       // each input vector has 3 features
+	unsigned int iterations = 500;
+	double learning_rate = 0.5;
+
+
+	// Parameters
+	double sigma0 = 2.0;
+	double tau = 10.0;
+	unsigned int map_width = 10;
+	unsigned int map_height = 10;
+	std::string evolving_func = "exponential";
+
+
+	KonohenMapEigen<double> km(map_width, map_height, input_size);
+
+	// Create NeighbouringFunction
+	NeighbouringFunctionEigen nf(sigma0, tau, map_width, map_height, evolving_func);
+
+	// Set support size
+	nf.set_support_size(2);
+
+	km.initialize(42);
+
+	std::vector<Eigen::VectorXd> data;
+	data.reserve(10);
+	for (int i = 0; i < 5; ++i) {
+		Eigen::VectorXd vec(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec(j) = 2;  // same values as before
+		}
+		data.push_back(vec);
+	}
+
+	for (int i = 5; i < 10; ++i) {
+		Eigen::VectorXd vec(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec(j) = 55;  // same values as before
+		}
+		data.push_back(vec);
+	}
+
+	for (int i = 10; i < 15; ++i) {
+		Eigen::VectorXd vec(input_size);
+		for (int j = 0; j < input_size; ++j) {
+			vec(j) = 8;  // same values as before
+		}
+		data.push_back(vec);
+	}
+
+	km.train(data, iterations, nf, learning_rate);
+
+	UClusteringEigen<double> UMap(km, 0.4);
+	UMap.compute();
+	Plotter plotter;
+	UMap.plot(plotter);
+
+}
 
 // Just create the folder...
 int main() {
-
-	Eigen::initParallel();
-	Eigen::setNbThreads(std::thread::hardware_concurrency());
+	//test_2D_konohen_map_Eigen();
+	//classification_test_Eigen();
+	clustering_test_eigen();
+	//Eigen::initParallel();
+	//Eigen::setNbThreads(std::thread::hardware_concurrency());
 	// classification_test();
 
 	// autograd_compile();
@@ -889,7 +1143,7 @@ int main() {
 	autograd_compile();
 	io_utils_compile();
 	*/
-	reservoir_compile();
+	//reservoir_compile();
 	// hopfield_compile();
 
 }

@@ -1,6 +1,6 @@
 #pragma once
-#ifndef MAPPINGS_KONOHEN_HPP
-#define MAPPINGS_KONOHEN_HPP
+#ifndef MAPPINGS_KONOHEN_EIGEN_HPP
+#define MAPPINGS_KONOHEN_EIGEN_HPP
 
 #include <memory>
 #include <iterator>
@@ -8,11 +8,14 @@
 #include <vector>
 #include <random>
 #include <limits>
+#include <Eigen/Dense>
 #include "../math/utilities.hpp"
+#include "../math/matrix/matrix_ops.hpp"
+
 
 // Enum that describes which evolving function to use on sigma
 enum evolving_function {
-	exponential, 
+	exponential,
 	linear,
 	piecewise,
 	inverse_time
@@ -23,10 +26,10 @@ enum dimension {
 	TWO_D
 };
 
-class NeighbouringFunction{
+class NeighbouringFunctionEigen {
 
 private:
-	
+
 	double sigma_0;
 	double sigma;
 	double tau;
@@ -42,13 +45,13 @@ private:
 
 public:
 
-	NeighbouringFunction(double sigma_0, double tau, unsigned int map_width, unsigned int map_height, std::string &evolving_func)
-	:sigma_0(sigma_0), tau(tau), map_width(map_width), map_height(map_height){
+	NeighbouringFunctionEigen(double sigma_0, double tau, unsigned int map_width, unsigned int map_height, std::string& evolving_func)
+		:sigma_0(sigma_0), tau(tau), map_width(map_width), map_height(map_height) {
 		this->set_sigma_evolving_function(evolving_func);
 		this->sigma = sigma_0;
 	}
 
-	double get_sigma() const{
+	double get_sigma() const {
 		return sigma;
 	}
 
@@ -56,7 +59,7 @@ public:
 		this->map_width = value;
 	}
 
-	double get_map_width() const{
+	double get_map_width() const {
 		return map_width;
 	}
 
@@ -68,7 +71,7 @@ public:
 		return map_height;
 	}
 
-	double get_sigma_0() const{
+	double get_sigma_0() const {
 		return sigma_0;
 	}
 
@@ -132,12 +135,13 @@ public:
 		case linear: this->sigma = sigma_0 * (1 - (static_cast<double>(iteration_step) / t_max));
 			break;
 
-		case piecewise: 
-			if(iteration_step < t_max/2){
+		case piecewise:
+			if (iteration_step < t_max / 2) {
 				this->sigma = sigma_0 * std::exp(-static_cast<double>(iteration_step) / tau);
 				break;
-			}else {
-				this->sigma = sigma_1 * std::exp(- (static_cast<double>(iteration_step) - t_max/2) / tau);
+			}
+			else {
+				this->sigma = sigma_1 * std::exp(-(static_cast<double>(iteration_step) - t_max / 2) / tau);
 				break;
 			}
 
@@ -147,14 +151,14 @@ public:
 
 		}
 
-		
+
 
 	}
 
 	// Providing an iterator over the neurons in a way that is transparent to the mapping 
 	class Iterator {
 
-		const NeighbouringFunction* owner;
+		const NeighbouringFunctionEigen* owner;
 
 		// this is the support size that assumes a meaning of radius in 2D
 		int support;
@@ -176,14 +180,14 @@ public:
 	public:
 
 
-		Iterator(const NeighbouringFunction* o, unsigned int w, unsigned int c)
+		Iterator(const NeighbouringFunctionEigen* o, unsigned int w, unsigned int c)
 			: owner(o), current_x(c), winner_x(w) {
 			strategy = ONE_D;
 			support = o->get_support_size();
 		}
 
-		Iterator(const NeighbouringFunction* o, unsigned int w_x, unsigned int w_y, unsigned int c_x, unsigned int c_y)
-			: owner(o), current_x(c_x), winner_x(w_x), current_y(c_y), winner_y(w_y){
+		Iterator(const NeighbouringFunctionEigen* o, unsigned int w_x, unsigned int w_y, unsigned int c_x, unsigned int c_y)
+			: owner(o), current_x(c_x), winner_x(w_x), current_y(c_y), winner_y(w_y) {
 			strategy = TWO_D;
 			support = o->get_support_size();
 		}
@@ -233,11 +237,11 @@ public:
 					next_x = std::max(0, static_cast<int>(winner_x) - static_cast<int>(support));
 
 				}
-				 
+
 				current_x = next_x;
 				current_y = next_y;
 			}
-			
+
 			return *this;
 		}
 
@@ -250,7 +254,7 @@ public:
 			return (current_x + current_y * owner->get_map_width());
 		}
 
-		unsigned int x_coordinate() const { 
+		unsigned int x_coordinate() const {
 			return (current_x);
 		}
 
@@ -259,13 +263,14 @@ public:
 		}
 
 		double contribution_weight() const {
-			unsigned int map_width = owner->get_map_width();  
-			const double sigma = owner->get_sigma(); 
+
+			unsigned int map_width = owner->get_map_width();
+			const double sigma = owner->get_sigma();
 
 			double dist = Utilities::euclidean_distance_2d(current_x, winner_x, current_y, winner_y);
 
 			// returning the neighbourhood function computed on the current neuron
-			return (std::exp(- (dist * dist) / (2 * sigma * sigma)));
+			return (std::exp(-(dist * dist) / (2 * sigma * sigma)));
 		}
 
 		void set_support(int dist) {
@@ -281,10 +286,11 @@ public:
 		unsigned int map_width = get_map_width();
 		unsigned int support_size = get_support_size();
 
-		if (winner > support_size) { 
+		if (winner > support_size) {
 			return Iterator(this, winner,
 				winner - support_size);
-		}else {
+		}
+		else {
 			return Iterator(this, winner, 0);
 		}
 	}
@@ -295,16 +301,17 @@ public:
 		unsigned int support_size = get_support_size();
 		unsigned int map_width = get_map_width();
 
-		
+
 		if (winner + support_size < map_width) {
 			return Iterator(this, winner,
 				winner + support_size + 1);
-		}else {
+		}
+		else {
 			return Iterator(this, winner, map_width);
 		}
-		
+
 	}
-		
+
 	// begin of an iteration in 2D
 	Iterator begin(unsigned int winner_x, unsigned int winner_y) const {
 
@@ -314,78 +321,77 @@ public:
 		int starting_x;
 		int starting_y;
 
-		winner_x < support_size ?  starting_x = 0 : starting_x = winner_x - support_size;
+		winner_x < support_size ? starting_x = 0 : starting_x = winner_x - support_size;
 		winner_y < support_size ? starting_y = 0 : starting_y = winner_y - support_size;
 
-		return Iterator(this, winner_x, winner_y, starting_x, starting_y); 
+		return Iterator(this, winner_x, winner_y, starting_x, starting_y);
 	}
 
 	// end of an iteration in 2D
 	Iterator end(unsigned int winner_x, unsigned int winner_y) const {
 
 		unsigned int support_size = get_support_size();
-		unsigned int map_width = get_map_width(); 
-		unsigned int map_height = get_map_height(); 
+		unsigned int map_width = get_map_width();
+		unsigned int map_height = get_map_height();
 
 		int ending_x;
 		int ending_y;
 
 		// basically we are setting the end of our iteration at the min of win.x + dx and max_x on the x-axis and
 		// at the min of win.y + dy and max_y on the y-axis.
-		(winner_y + support_size < map_height) ? ending_y = winner_y + support_size + 1  : ending_y = map_height;
+		(winner_y + support_size < map_height) ? ending_y = winner_y + support_size + 1 : ending_y = map_height;
 		winner_x < support_size ? ending_x = 0 : ending_x = winner_x - support_size;
 
 		return Iterator(this, winner_x, winner_y, ending_x, ending_y);
-		
-		
+
+
 	}
-	
+
 
 };
 
-template <typename DataType=float>
-class KonohenMap {
+template <typename DataType = float>
+class KonohenMapEigen {
 
 private:
 
-	std::vector<std::unique_ptr<DataType[]>> weight_vectors;
-
+	// This matrix is assigned s.t. every neuron is accessed with its index, 
+	// so they are stored as a vector. You can access to a single weight component x_k 
+	// of a neuron n with weight_vectors(n)(x_k)
+	Eigen::Matrix<DataType, Eigen::Dynamic, Eigen::Dynamic> weight_vectors;
 	unsigned int mapping_cortex_width;
 	unsigned int mapping_cortex_height;
 	unsigned int stimulus_cortex_input_size;
 
 	dimension dim;
 
-	// Allocate the required memory to store the weight vectors for each neurons.
-	// allow explicit deallocation for fine grained memory control.
-	void allocate() {
-		int mapping_cortex_size = mapping_cortex_width * mapping_cortex_height;
-		weight_vectors.reserve(mapping_cortex_size);
-		for (unsigned int i = 0; i < mapping_cortex_size; ++i) {
-			weight_vectors.emplace_back(
-				std::make_unique<DataType[]>(stimulus_cortex_input_size)
-			);
-		}
-	}
 
 	void deallocate() {
-		// free memory of each weight vector
-		for (auto& neuron_ptr : weight_vectors) {
-			neuron_ptr.reset(); 
-		}
-		// clear the vector itself
-		weight_vectors.clear(); 
+		weight_vectors.resize(0, 0);
+	}
+
+	void allocate() {
+		Eigen::MatrixXd M( stimulus_cortex_input_size, mapping_cortex_width * mapping_cortex_height);
+		weight_vectors = M;
+	}
+
+	const int x_from_idx(int idx) {
+		return idx % mapping_cortex_width;
+	}
+
+	const int y_from_idx(int idx) {
+		return idx / mapping_cortex_width;
 	}
 
 public:
 
-	KonohenMap(unsigned int cortex_size, unsigned int input_size):
+	KonohenMapEigen(unsigned int cortex_size, unsigned int input_size) :
 		mapping_cortex_width(cortex_size), mapping_cortex_height(1), stimulus_cortex_input_size(input_size) {
 		dim = ONE_D;
 		allocate();
 	}
 
-	KonohenMap(unsigned int cortex_width, unsigned int cortex_height, unsigned int input_size) :
+	KonohenMapEigen(unsigned int cortex_width, unsigned int cortex_height, unsigned int input_size) :
 		mapping_cortex_width(cortex_width), mapping_cortex_height(cortex_height), stimulus_cortex_input_size(input_size) {
 		dim = TWO_D;
 		allocate();
@@ -394,14 +400,22 @@ public:
 	void initialize(unsigned long long seed) {
 		std::mt19937 rng(seed);
 		std::uniform_real_distribution<DataType> dist(0.0, 1.0);
-
 		// assigning for each neuron's component a random value from 0.0 to 1.0
-		for (auto& neuron_ptr : weight_vectors) {
+		for (unsigned int i = 0; i < mapping_cortex_width * mapping_cortex_height; ++i) {
 			for (unsigned int j = 0; j < stimulus_cortex_input_size; ++j) {
-				neuron_ptr[j] = dist(rng);
+				weight_vectors(j, i) = dist(rng);
 			}
 		}
+
 	}
+
+
+	/*
+	void initialize() {
+		weight_vectors = Eigen::MatrixXd::Random(mapping_cortex_width * mapping_cortex_height, stimulus_cortex_input_size);
+	}
+	*/
+	
 
 	const int get_input_size() const {
 		return stimulus_cortex_input_size;
@@ -415,17 +429,20 @@ public:
 		return mapping_cortex_height;
 	}
 
-	const std::unique_ptr<DataType[]>& get_weights(unsigned int neuron_idx) const {
-		return weight_vectors[neuron_idx];
+	Eigen::VectorXd get_weights(unsigned int neuron_idx) const {
+		return weight_vectors.col(neuron_idx);
+	}
+
+	Eigen::VectorXd get_weights(unsigned int x, unsigned int y) const { 
+		return weight_vectors.col(x + y*mapping_cortex_width);
 	}
 
 
-
 	// This function receives a collection of datavectors and has to train the mapping cortex
-	void train(const std::vector<std::unique_ptr<DataType[]>>& data,
+	void train(const std::vector<Eigen::VectorXd> data,
 		unsigned int iterations,
-		NeighbouringFunction& nf,
-		double learning_rate = 0.1 ) {
+		NeighbouringFunctionEigen& nf,
+		double learning_rate = 0.1) {
 
 		for (unsigned int t = 0; t < iterations; t++) {
 			for (const auto& input : data) {
@@ -441,57 +458,53 @@ public:
 						double h = it.contribution_weight();
 
 						// update weights of neuron idx
-						for (unsigned int j = 0; j < stimulus_cortex_input_size; ++j) {
-							weight_vectors[idx][j] += learning_rate * h * (input[j] - weight_vectors[idx][j]);
-						}
+						weight_vectors.col(idx) += learning_rate * h * (input - weight_vectors.col(idx));
+						
 					}
 
 				}
 				else if (dim == TWO_D) {
-					
-					int bmu_x = bmu % mapping_cortex_width;
-					int bmu_y = bmu / mapping_cortex_width;
 
-
+					int bmu_x = x_from_idx(bmu);
+					int bmu_y = y_from_idx(bmu); 
 
 					// iterate over neighbors of BMU
 					for (auto it = nf.begin(bmu_x, bmu_y); it != nf.end(bmu_x, bmu_y); ++it) {
 
 						unsigned int idx = it.index();
-					
 						double h = it.contribution_weight();
-
 						// update weights of neuron idx
-						for (unsigned int j = 0; j < stimulus_cortex_input_size; ++j) {
-							weight_vectors[idx][j] += learning_rate * h * (input[j] - weight_vectors[idx][j]);
-						}
-
+						weight_vectors.col(idx) += learning_rate * h * (input - weight_vectors.col(idx));
+						
 					}
 
 				}
-				
+
 			}
 			// evolve neighborhood radius
 			nf.evolve_sigma(t);
 		}
 	}
+	
 
-	unsigned int map(const std::unique_ptr<DataType[]>& x) const {
-		unsigned int winner_idx;
-		double min_distance, distance;
-		min_distance = std::numeric_limits<double>::max();
 
-		for (unsigned int j = 0; j < mapping_cortex_height; ++j) {
-			for (unsigned int i = 0; i < mapping_cortex_width; ++i) {
-				distance = Utilities::euclidean_distance(x, weight_vectors[i + j * mapping_cortex_width], stimulus_cortex_input_size);
-				if (distance < min_distance) {
-					winner_idx = i + j * mapping_cortex_width;
-					min_distance = distance;
-				}
+
+	unsigned int map(const Eigen::VectorXd& x) const {
+		
+		unsigned int winner = 0;
+		double min_dist = std::numeric_limits<double>::max();
+
+		for (int i = 0; i < weight_vectors.cols(); ++i) {
+
+			double dist = (weight_vectors.col(i) - x).squaredNorm();
+
+			if (dist < min_dist) {
+				min_dist = dist;
+				winner = i;
 			}
 		}
 
-		return winner_idx;
+		return winner;
 
 	}
 
