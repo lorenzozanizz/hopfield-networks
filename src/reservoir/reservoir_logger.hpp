@@ -31,7 +31,7 @@ class ReservoirLogger {
 
 	using ReservoirState = Eigen::Matrix<DataType, Eigen::Dynamic, 1>;
 
-	NamedVectorCollection<double> nvc;
+	NamedVectorCollection<double> nvc; /*Note: where is this class defined?? I cannot find it*/
     Plotter* plotter;
 
 	bool record_norm;
@@ -41,13 +41,18 @@ class ReservoirLogger {
 
 public:
 
-    ReservoirLogger() : record_norm(false), record_state(false), do_plot(false) { }
+    // Note: I'm doing some comments to better understand the code, feel free to delete them
+
+    ReservoirLogger() : record_norm(false) /*Note: to check stability*/,
+        record_state(false), 
+        do_plot(false) /*Note: to visualize the evolution of the reservoir*/ { }
 	
     void assign_plotter(Plotter* plot) {
         plotter = plot;
     }
 
-	void set_collect_states(bool value, 
+    // Note: this sets the requirement to save the states collected in the selected .gif
+	void set_collect_states(bool value /*Note : I think that you are not using this variable in this scope*/,
 		const std::string& into = "states.gif",
 		unsigned int width = 0, unsigned int height = 0) {
 		record_state = true;
@@ -65,7 +70,7 @@ public:
         if (record_state) {
             if (!log_buf.write_buffer)
                 throw std::runtime_error("Attempting to update a non initialized buffer!");
-            this->update_logger_buffer(new_state, /*reset=*/ false);
+            this->update_logger_buffer(new_state, /*reset=*/ false); 
             gio.write_frame(log_buf.write_buffer.get());
         }
 	}
@@ -92,7 +97,7 @@ public:
             
             gio.begin(states_gif_save, width, height, /* delay in 10*ms */ 20);
 
-            this->update_logger_buffer(begin_state, /* reset = */ true);
+            this->update_logger_buffer(begin_state, /* reset = */ true); 
             gio.write_frame(log_buf.write_buffer.get());
 
         }
@@ -101,7 +106,8 @@ public:
             // Set up the named data collection
             this->nvc.clear();
 
-            nvc.register_name("Reservoir norm", /* reserve*/ 25);
+            nvc.register_name("Reservoir norm", /* reserve*/ 25); /*Note: since I didn't find the definition of NamedVectorCollection
+                                                                    I don't understand this point*/
         }
     }
 
@@ -130,7 +136,7 @@ protected:
         // specified in the hopfield network containing this state.
         const auto required_width = visual_width;
         const auto required_height = visual_height;
-        static_assert(GifWriterIO::required_channels == sizeof(uint32_t));
+        static_assert(GifWriterIO::required_channels == sizeof(uint32_t)); // Note: I didn't understand this
 
         // If possible, keep the same buffer!
         if (log_buf.width != required_width || log_buf.height != required_height) {
@@ -141,7 +147,7 @@ protected:
             log_buf.width = required_width;
             log_buf.height = required_height;
         }
-        if (reset) {
+        if (reset) { /*Note: clearing before writing the next frame*/
             std::memset(log_buf.write_buffer.get(), 0, log_buf.height * log_buf.width *
                 GifWriterIO::required_channels);
         }

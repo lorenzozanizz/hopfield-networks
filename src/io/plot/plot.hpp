@@ -177,7 +177,7 @@ public:
 
 			auto raw_pipe = pipe.raw();
 			pipe.send_line("splot '-' matrix with image");
-			for (int i = 0; i < width; ++i) {
+			for (int i = 0; i < height; ++i) {
 				for (int j = 0; j < width; ++j)
 					fprintf(raw_pipe, "%f ", buffer[i * width + j]);
 				fprintf(raw_pipe, "\n");

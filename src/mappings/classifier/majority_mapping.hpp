@@ -11,6 +11,7 @@
 #include <limits>
 #include "../konohen_mapping.hpp"
 #include "../../io/datasets/dataset.hpp"
+#include "../../io/plot/plot.hpp"
 
 template <typename DataType = float>
 class MajorityMapping {
@@ -94,6 +95,25 @@ public:
 			}
 		}
 		return -1;
+	}
+
+	void plot(Plotter& plotter) {
+		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
+		int num_classes = labels_map.size(); 
+
+		std::vector<int> labels(num_neurons);
+
+		for (int i = 0; i < num_neurons; ++i) {
+			int lbl = map_neuron_label[i];
+			if (lbl < 0) lbl = -1; //unknown class
+			labels[i] = lbl;
+		}
+
+		plotter.context()
+			.set_title("SOM Classification Map")
+			.show_discrete_categories(labels, trained_map.get_map_width(), trained_map.get_map_height(), num_classes+1);
+
+		plotter.block();
 	}
 
 };
