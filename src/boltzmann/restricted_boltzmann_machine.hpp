@@ -8,6 +8,7 @@
 #include <vector>
 #include <cassert>
 
+#include "../io/io_utils.hpp"
 #include "../io/plot/plot.hpp"
 #include "../io/datasets/dataset.hpp"
 // Import Eigen needed for the operations. 
@@ -88,13 +89,14 @@ public:
 
     template <typename AggregateType>
     // sample hidden from visible
-    void sample_hidden(const AggregateType& visible, AggregateType& hidden, bool do_sample) {
+    void sample_hidden(const AggregateType& visible, AggregateType& hidden, bool do_sample, 
+        double temperature = 1.0) {
         // We stored the matrix w as a (visible, hidden) matrix so  we need 
         // to transpose w to compute the hidden local fields
         hidden_local_fields.noalias() = (weights.transpose() * visible).colwise() + b_h;
         // Compute the sigmoid. 
         auto& probs = hidden_local_fields;
-        probs = (1.0 / (1.0 + (-hidden_local_fields.array()).exp())).matrix();
+        probs = (1.0 / (1.0 + (-hidden_local_fields.array() / temperature).exp())).matrix();
 
         // Eigen optimizes this writing inline. 
         if (do_sample)
@@ -110,13 +112,14 @@ public:
     // Sample visible units from the hidden units using the 
     // conditional probability p( v | h = s_h ), as described in 
     // Mehlig
-    void sample_visible(AggregateType& visible, const AggregateType& hidden, bool do_sample) {
+    void sample_visible(AggregateType& visible, const AggregateType& hidden, bool do_sample,
+        double temperature = 1.0) {
         // We stored the matrix w as a (visible, hidden) matrix so this can
         // be done, vice versa we need to transpose w to compute the hidden local fields
         visible_local_fields.noalias() = (weights * hidden).colwise() + b_v;
         // Compute the sigmoid. 
         auto& probs = visible_local_fields;
-        probs = (1.0 / (1.0 + (-visible_local_fields.array()).exp())).matrix();
+        probs = (1.0 / (1.0 + (-visible_local_fields.array() / temperature).exp())).matrix();
 
         if (do_sample)
             visible = probs.unaryExpr([this](FloatingType p) {
@@ -137,7 +140,7 @@ public:
             visible(i) = (uni(rng) < prob_on) ? 1.0 : 0;
     }
 
-    void run_cd_k(unsigned int k, bool activate_final = false) {
+    void run_cd_k(unsigned int k, double temperature = 1.0, bool activate_final = false) {
         // Run the update on the network for k times, using the marginal
         // conditional distributions. This acts on the hidden and state vectors,
         // updating the notify
@@ -160,7 +163,8 @@ public:
         VectorCollection<Vector>& data,
         unsigned int batch_size,
         double lr,
-        int k /* K parameter of the contrastive divergence algorithm. */
+        int k /* K parameter of the contrastive divergence algorithm. */,
+        double decay = 1e-3
     ) {
         int num_samples = data.size();
 
@@ -175,8 +179,11 @@ public:
         // Resize the buffered local fields matrices to avoid overhead of reallocation
         this->resize_local_fields(batch_size);
 
+        MultiProgressBar prog_bar(epochs);
         for (int epoch = 0; epoch < epochs; ++epoch)
         {
+            prog_bar.update(epoch);
+            prog_bar.print_intermediate("Magnitude of the weights: " + std::to_string(weights.norm()));
             // For each epoch we need to take into account all patterns
             // in the training. 
             data.shuffle();
@@ -196,32 +203,37 @@ public:
                     sample_hidden(logging_batch, batch_hidden, true);
                     sample_visible(logging_batch, batch_hidden, false);
 
-                    notify_loss((batch_visible - logging_batch).norm());
+                    auto loss = (batch_visible - logging_batch).norm();
+                    prog_bar.print_intermediate("Retrieval loss: " + std::to_string(loss));
+                    notify_loss(loss);
                 }
 
-                // This is the positive phase, DO SAMPLE the hidden states!
-                sample_hidden(batch_visible, batch_hidden, /* do_sample */ true);
+                // This is the positive phase, DO NOT Sample the hidden states!
+                sample_hidden(batch_visible, batch_hidden, /* do_sample */ false);
 
                 // NOW we use CD-K to compute the negative phase. 
                 negative_batch_hidden = batch_hidden;
                 sample_visible(negative_batch_visible, negative_batch_hidden, /* do sample */ false);
                 for (int cd_step = 0; cd_step < k; ++cd_step) {
-                    sample_hidden(negative_batch_visible, negative_batch_hidden, true);
+                    sample_hidden(negative_batch_visible, negative_batch_hidden, false);
                     sample_visible(negative_batch_visible, negative_batch_hidden, /* do sample */ false);
                 }
                 sample_hidden(negative_batch_visible, negative_batch_hidden, false);
+                sample_visible(negative_batch_visible, negative_batch_hidden, /* do sample */ true);
 
                 // Apply the positive and negative updates, noting that when we multiply
                 // together the hidden and visible states we are effectively accumulating the
                 // update over the entire batch and we need to normalize by /batch_size
-                weights += lr * (batch_visible * batch_hidden.transpose()) / batch_size;
+                // weights += lr * (batch_visible * batch_hidden.transpose()) / batch_size;
                 b_v += lr * batch_visible.rowwise().mean();
                 b_h += lr * batch_hidden.rowwise().mean();
 
                 // negative phase
-                weights -= lr * (negative_batch_visible * negative_batch_hidden.transpose()) / batch_size;
+                // weights -= lr * (negative_batch_visible * negative_batch_hidden.transpose()) / batch_size;
                 b_v -= lr * negative_batch_visible.rowwise().mean();
                 b_h -= lr * negative_batch_hidden.rowwise().mean();
+                weights *= (1 - lr * decay);
+
             }
         }
     }
@@ -254,7 +266,12 @@ public:
 
     void plot_state(Plotter& p, unsigned int width, unsigned int height) {
         auto ctx = p.context();
-        ctx.show_heatmap( visible.data(), width, height , "gray" );
+        ctx.set_title("State").show_heatmap(visible.data(), width, height, "gray");
+    }
+
+    void plot_kernel(Plotter& p, unsigned int hidden_index, unsigned int width, unsigned int height) {
+        auto ctx = p.context();
+        ctx.set_title("Kernel").show_heatmap(weights.col(hidden_index).data(), width, height, "gray");
     }
 
     void notify_energy() {

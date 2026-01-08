@@ -231,7 +231,6 @@ namespace ImageUtils {
 		}
 	}
 
-
 	void background_aware_binarize(unsigned char* img, unsigned int width, unsigned int height) {
 		// A simple naive implementation of Otsu's method 
 		// https://en.wikipedia.org/wiki/Otsu%27s_method

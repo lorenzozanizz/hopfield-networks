@@ -9,7 +9,8 @@
 
 
 #define EIGEN_USE_THREADS 
-#define EIGEN_DONT_PARALLELIZE 0
+#undef EIGEN_DONT_PARALLELIZE
+#define EIGEN_USE_OPENMP
 #include <Eigen/Core>
 #include <Eigen/Core>
 #include <Eigen/Dense>

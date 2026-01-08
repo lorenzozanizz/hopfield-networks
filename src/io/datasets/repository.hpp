@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <cmath>
 #include <fstream>
+#include <omp.h>
 
 #include "../image/images.hpp"
 #include "dataset.hpp"

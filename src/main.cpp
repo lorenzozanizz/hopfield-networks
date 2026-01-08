@@ -31,6 +31,8 @@
 #include "io/datasets/dataset.hpp"
 #include "io/datasets/repository.hpp"
 
+#include "utils/timing.hpp"
+
 #include <cfenv> 
 #pragma STDC FENV_ACCESS ON
 
@@ -344,22 +346,35 @@ boltzmann_compile() {
 
 	Plotter p;
 
-	RestrictedBoltzmannMachine<float> machine(64*64, 100);
+	RestrictedBoltzmannMachine<float> machine(64*64, 150);
 	machine.initialize_weights(0.01);
 
 	VectorCollection<VectorXf>  dataset(1000);
 	DatasetRepo::load_real_faces_128("archive_reduced", 1000, dataset);
+	for (int i = 0; i < 5; ++i)
+	{
+		p.context().show_heatmap(dataset.x_of(i).data(), 64, 64, "greyscale");
+	}
 
-	std::cout << "Loaded the dataset!" <<  dataset.size() << std::endl;
+	std::cout << "Loaded the dataset! " <<  dataset.size() << std::endl;
+	SegmentTimer timer; 
+	machine.load_weights("weights.pt");
+	{
+		auto scoped = timer.scoped("Training");
 
-	machine.train_cd(10, dataset, 25, 0.05, 10);
-	
+		machine.train_cd(20, dataset, 1, 0.04, 10);
+	}
 	for (int i = 0; i < 8; ++i) {
+		machine.plot_kernel(p, i, 64, 64);
+
 		machine.random_visible();
-		machine.run_cd_k(5, i % 2);
+		machine.run_cd_k(60, 1.5, true);
 		machine.plot_state(p, 64, 64);
 	}
 
+	machine.dump_weights("weights.pt");
+
+	// timer.print();
 	p.block();
 }
 
@@ -809,8 +824,11 @@ void classification_test() {
 // Just create the folder...
 int main() {
 
+	std::cout << "Number of threads: " << std::thread::hardware_concurrency();
 	Eigen::initParallel();
 	Eigen::setNbThreads(std::thread::hardware_concurrency());
+
+	std::cout << "Eigen threads: " << Eigen::nbThreads() << "\n";
 	// classification_test();
 
 	// autograd_compile();
@@ -818,6 +836,9 @@ int main() {
 	autograd_compile();
 	io_utils_compile();
 	*/
+
+
+
 	boltzmann_compile();
 	// reservoir_compile();
 	// hopfield_compile();
