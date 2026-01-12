@@ -1083,7 +1083,6 @@ void clustering_test_eigen() {
 	unsigned int map_height = 10;
 	std::string evolving_func = "exponential";
 
-
 	KonohenMapEigen<double> km(map_width, map_height, input_size);
 
 	// Create NeighbouringFunction
@@ -1129,11 +1128,126 @@ void clustering_test_eigen() {
 
 }
 
+using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
+void classification_MNIST() {
+	VectorDataset<IntVector, unsigned int> mnist(100);
+	DatasetRepo::load_mnist_eigen("C:/Users/tomma/HPC/AMSC/Boltzmann-Network/proj/hopfield-networks/build/vector_mnist.data", 400, mnist);
+
+	// Parameters
+	unsigned int input_size = 28*28;       // each input vector has 3 features
+	unsigned int iterations = 300;
+	double learning_rate = 0.5;
+
+
+	// Parameters
+	double sigma0 = 2.0;
+	double tau = 10.0;
+	unsigned int map_width = 10;
+	unsigned int map_height = 10;
+	std::string evolving_func = "exponential";
+
+	// ----------------------
+	// Create map and neighborhood
+	// ----------------------
+	KonohenMapEigen<double> km(map_width, map_height, input_size);
+
+	// Create NeighbouringFunction
+	NeighbouringFunctionEigen nf(sigma0, tau, map_width, map_height, evolving_func);
+
+	// Set support size
+	nf.set_support_size(2);
+
+	km.initialize(42);
+
+	std::vector<Eigen::VectorXd> data_double;
+	data_double.reserve(50);
+
+	for (const auto& v : mnist.get_n_elements_data(50)) {
+		data_double.push_back(v.cast<double>());
+	}
+
+	km.train(data_double, iterations, nf, learning_rate);
+	
+	std::map<int, std::string> labels_map;
+	labels_map[0] = "zero";
+	labels_map[1] = "one";
+	labels_map[2] = "two";
+	labels_map[3] = "three";
+	labels_map[4] = "four";
+	labels_map[5] = "five";
+	labels_map[6] = "six";
+	labels_map[7] = "seven";
+	labels_map[8] = "eight";
+	labels_map[9] = "nine";
+	
+	
+	MajorityMappingEigen<double> classifier(km, 0.6, labels_map);
+
+	DatasetEigen<double, int> dataset(50);
+
+	for (int i = 50; i < dataset.size(); ++i) {
+		dataset.add_sample(mnist.x_of(i).cast<double>(), mnist.y_of(i));
+	}
+	
+
+	classifier.classify(dataset);
+
+	Plotter plotter;
+	classifier.plot(plotter);
+
+}
+
+using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
+void clustering_MNIST() {
+
+	VectorDataset<IntVector, unsigned int> mnist(400); 
+	DatasetRepo::load_mnist_eigen("C:/Users/tomma/HPC/AMSC/Boltzmann-Network/proj/hopfield-networks/build/vector_mnist.data", 400, mnist);
+
+	// Parameters
+	unsigned int input_size = 28*28;       // each input vector has 3 features
+	unsigned int iterations = 500;
+	double learning_rate = 0.8;
+
+
+	// Parameters
+	double sigma0 = 2.0;
+	double tau = 10.0;
+	unsigned int map_width = 5;
+	unsigned int map_height = 5;
+	std::string evolving_func = "exponential";
+
+	KonohenMapEigen<double> km(map_width, map_height, input_size);
+
+	// Create NeighbouringFunction
+	NeighbouringFunctionEigen nf(sigma0, tau, map_width, map_height, evolving_func);
+
+	// Set support size
+	nf.set_support_size(2);
+
+	km.initialize(42);
+
+	std::vector<Eigen::VectorXd> data_double;
+	data_double.reserve(mnist.get_data().size());
+
+	for (const auto& v : mnist.get_data()) {
+		data_double.push_back(v.cast<double>());
+	}
+
+	km.train(data_double, iterations, nf, learning_rate);
+
+
+	UClusteringEigen<double> UMap(km, 0.4);
+	UMap.compute();
+	Plotter plotter;
+	UMap.plot(plotter);
+}
+
 // Just create the folder...
 int main() {
 	//test_2D_konohen_map_Eigen();
-	//classification_test_Eigen();
-	clustering_test_eigen();
+	classification_test_Eigen();
+	clustering_MNIST();
+	//classification_MNIST();
 	//Eigen::initParallel();
 	//Eigen::setNbThreads(std::thread::hardware_concurrency());
 	// classification_test();

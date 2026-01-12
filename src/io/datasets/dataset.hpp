@@ -5,6 +5,7 @@
 #include <tuple>
 #include <vector>
 #include <functional>
+#include <algorithm>
 
 template <typename DataType, typename YType>
 class Dataset {
@@ -98,6 +99,20 @@ public:
 
     const DataID id_of(index_t i) const {
         return id_data.at(i);
+    }
+
+    std::vector<XType> get_data() {
+        return x_data;
+    }
+
+    std::vector<YType> get_labels() {
+        return y_data;
+    }
+
+    // Returns the first n elements of data vector
+    std::vector<XType> get_n_elements_data(size_t n) const {
+        n = std::min(n, x_data.size());
+        return std::vector<XType>(x_data.begin(), x_data.begin() + n);
     }
 
     class BatchView { 
