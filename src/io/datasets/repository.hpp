@@ -22,10 +22,16 @@ namespace DatasetRepo {
 
 	using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
 
+	template <typename DataType>
+	using DataVector = Eigen::Matrix<DataType, Eigen::Dynamic, 1>;
+
+	template <typename DataType>
 	void load_mnist_eigen(
-		std::string& path,
+		const std::string path,
 		unsigned int amount,
-		VectorDataset<IntVector, unsigned int>& entries
+		VectorDataset<DataVector<DataType>, unsigned int>& entries,
+		DataType threshold = 0, DataType low_value = DataType(0),
+		DataType high_value = DataType(1)
 	) {
 		// Load all the vector in the input dataset. The standard file format for
 		// the vectordataset is a human-readable list of numbers. 
@@ -33,10 +39,11 @@ namespace DatasetRepo {
 		
 		std::ifstream in(path);
 		if (!in)
-			std::runtime_error("Could not open the file stream to load the mnist dataset");
+			throw std::runtime_error("Could not open the file stream to load the mnist dataset");
 
 		std::string line;
 		int file_amount = 0;
+		unsigned int read_amt = 0;
 
 		// Read "amount: N" 
 		if (std::getline(in, line)) {
@@ -45,7 +52,7 @@ namespace DatasetRepo {
 			iss >> dummy >> file_amount;
 		}
 
-		IntVector vector(28 * 28);
+		DataVector<DataType> vector(28 * 28);
 		while (std::getline(in, line)) {
 			// Skip away empty lines and comments 
 			unsigned int id, label;
@@ -69,16 +76,94 @@ namespace DatasetRepo {
 				std::istringstream iss(line);
 				std::string dummy; iss >> dummy;
 				// "data:" 
-				int value;
+				DataType value;
 				for (int i = 0; i < 28 * 28; ++i) {
 					iss >> value;
+					if (threshold) {
+						if (value > threshold) value = high_value;
+						else value = low_value;
+					}
 					vector(i) = value;
 				}
 			}
 		
+
 			entries.add_sample(vector, label, id);
+			read_amt++;
+			if (read_amt >= amount)
+				break;
 		}
 	}
+
+
+	// Here we ignore the labels, simply storing the data as a collection.
+	template <typename DataType>
+	void load_mnist_eigen(
+		const std::string path,
+		unsigned int amount,
+		VectorCollection<DataVector<DataType>>& entries,
+		DataType threshold = 0, DataType low_value = DataType(0),
+		DataType high_value = DataType(1)
+	) {
+		// Load all the vector in the input dataset. The standard file format for
+		// the vectordataset is a human-readable list of numbers. 
+		entries.reserve(amount);
+
+		std::ifstream in(path);
+		if (!in)
+			throw std::runtime_error("Could not open the file stream to load the mnist dataset");
+
+		std::string line;
+		int file_amount = 0;
+		unsigned int read_amt = 0;
+		// Read "amount: N" 
+		if (std::getline(in, line)) {
+			std::istringstream iss(line);
+			std::string dummy; // dummy = "amount:" 
+			iss >> dummy >> file_amount;
+		}
+		DataVector<DataType> vector(28 * 28);
+		while (std::getline(in, line)) {
+			// Skip away empty lines and comments 
+			unsigned int id, label;
+			if (line.empty() || line.rfind("#", 0) == 0) continue;
+			// --- id --- 
+			{
+				std::istringstream iss(line);
+				std::string dummy;
+				iss >> dummy >> id; // dummy = "id:"
+			}
+			// --- label ---
+			std::getline(in, line);
+			{
+				std::istringstream iss(line);
+				std::string dummy;
+				iss >> dummy >> label; // dummy = "label:" 
+			}
+			// --- data --- 
+			std::getline(in, line);
+			{
+				std::istringstream iss(line);
+				std::string dummy; iss >> dummy;
+				// "data:" 
+				DataType value;
+				for (int i = 0; i < 28 * 28; ++i) {
+					iss >> value;
+					if (threshold) {
+						if (value > threshold) value = high_value;
+						else value = low_value;
+					}
+					vector(i) = value;
+				}
+			}
+
+			entries.add_sample(vector, id);
+			read_amt++;
+			if (read_amt >= amount)
+				break;
+		}
+	}
+
 
 	void load_mnist_vector(
 		std::string path,
@@ -89,7 +174,7 @@ namespace DatasetRepo {
 
 		std::ifstream in(path);
 		if (!in)
-			std::runtime_error("Could not open the file stream to load the mnist dataset");
+			throw std::runtime_error("Could not open the file stream to load the mnist dataset");
 
 		std::string line;
 		int file_amount = 0;
@@ -100,6 +185,7 @@ namespace DatasetRepo {
 			std::string dummy; // dummy = "amount:" 
 			iss >> dummy >> file_amount;
 		}
+		unsigned int read_amt = 0;
 
 		// This version uses a c++ vector instead of an eigen vector
 		std::vector<unsigned char> vector(28 * 28);
@@ -132,8 +218,11 @@ namespace DatasetRepo {
 					vector[i] = value;
 				}
 			}
-
+			// DO NOT DISCRETIZE TO 0,1  INTERVAL IN THIS CONFIGURATION. 
 			values.add_sample(vector, label, id);
+			read_amt++;
+			if (read_amt >= amount)
+				break;
 		}
 	}
 

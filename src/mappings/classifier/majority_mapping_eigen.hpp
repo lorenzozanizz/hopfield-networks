@@ -56,7 +56,8 @@ public:
 			hits[idx] = vector;
 		}
 		hits_map = hits;
-		Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> M(trained_map.get_map_width(), trained_map.get_map_height());
+		Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> M(
+			trained_map.get_map_width(), trained_map.get_map_height());
 		map_neuron_label = M;
 
 	}
@@ -160,13 +161,18 @@ public:
 			for (int i = 0; i < width; ++i) {
 				int lbl = map_neuron_label(i, j);
 				if (lbl < 0) lbl = -1; //unknown class
-				labels[from_xy_to_idx(i,j)] = lbl;
+				labels[from_xy_to_idx(i,j)] = lbl + 1;
 			}
 		}
 		
+		for (int i = 0; i < width * height; ++i)
+			std::cout << labels[i] << " ";
+		std::cout << std::endl;
 		plotter.context()
 			.set_title("SOM Classification Map")
-			.show_discrete_categories(labels, trained_map.get_map_width(), trained_map.get_map_height(), num_classes + 1);
+			.show_discrete_categories(labels, trained_map.get_map_width(),
+				trained_map.get_map_height(), num_classes + 1,
+			/* zero category is black */ true);
 
 		plotter.block();
 	}
