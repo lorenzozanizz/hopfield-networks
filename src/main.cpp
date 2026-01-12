@@ -352,23 +352,41 @@ boltzmann_compile() {
 
 	Plotter p;
 
-	RestrictedBoltzmannMachine<float> machine(64*64, 100);
-	machine.initialize_weights(0.01);
+	RestrictedBoltzmannMachine<float> machine(28*28, 529);
+	RestrictedBoltzmannMachine<float> machine2(529, 361);
 
-	VectorCollection<VectorXf>  dataset(1000);
-	DatasetRepo::load_real_faces_128("archive_reduced", 1000, dataset);
+	machine.initialize_weights(0.008);
+	machine2.initialize_weights(0.008);
+
+	VectorCollection<VectorXf>  dataset(800);
+	DatasetRepo::load_mnist_eigen<float>("vector_mnist.data", 800, dataset,
+		/*threshold */ 127, 0.0, 1.0);
 
 	std::cout << "Loaded the dataset!" <<  dataset.size() << std::endl;
 
-	machine.train_cd(10, dataset, 25, 0.05, 10);
+	machine.train_cd(50, dataset, 25, 0.02, 10);
 	
+	VectorCollection<VectorXf>  out_dataset(800);
+	machine.map_into_hidden(dataset, out_dataset, 25);
+
+	p.context().set_title("State").show_heatmap(out_dataset.x_of(0).data(), 23, 23, "gray");
 	for (int i = 0; i < 8; ++i) {
 		machine.random_visible();
-		machine.run_cd_k(5, i % 2);
-		machine.plot_state(p, 64, 64);
+		machine.plot_kernel(p, i, 28, 28);
 	}
 
 	p.block();
+
+	machine2.train_cd(40, out_dataset, 25, 0.02, 10);
+	for (int i = 0; i < 8; ++i) {
+		machine2.random_visible();
+		machine2.plot_kernel(p, i, 23, 23);
+		machine2.plot_higher_order_kernel(p, i, 28, 28, machine);
+	}
+
+	p.block();
+
+
 }
 
 void
@@ -1024,8 +1042,9 @@ void classification_test_Eigen() {
 
 
 	std::map<int, std::string> labels_map;
-	labels_map[0] = "ones";
-	labels_map[1] = "fifties";
+	labels_map[0] = "unknown";
+	labels_map[1] = "ones";
+	labels_map[2] = "fifties";
 
 	MajorityMappingEigen<double> classifier(km, 0.6, labels_map);
 
@@ -1131,13 +1150,15 @@ void clustering_test_eigen() {
 
 // Just create the folder...
 int main() {
-	//test_2D_konohen_map_Eigen();
-	//classification_test_Eigen();
-	clustering_test_eigen();
-	//Eigen::initParallel();
-	//Eigen::setNbThreads(std::thread::hardware_concurrency());
+	// test_2D_konohen_map_Eigen();
+	// classification_test_Eigen();
+	// clustering_test_eigen();
+
+	Eigen::initParallel();
+	Eigen::setNbThreads(std::thread::hardware_concurrency());
 	// classification_test();
 
+	boltzmann_compile();
 	// autograd_compile();
 	/*
 	autograd_compile();

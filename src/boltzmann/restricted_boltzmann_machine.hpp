@@ -73,6 +73,10 @@ public:
         visible_local_fields.resize(nv, batch_size);
     }
 
+    const Matrix& get_weights() const {
+        return weights;
+    }
+
     void initialize_weights(double std) {
         // Randomly initializes the weights. 
         std::normal_distribution<FloatingType> dist(0.0, std);
@@ -140,15 +144,15 @@ public:
             visible(i) = (uni(rng) < prob_on) ? 1.0 : 0;
     }
 
-    void run_cd_k(unsigned int k, double temperature = 1.0, bool activate_final = false) {
+    void run_cd_k(unsigned int k, bool activate_final = false, double temperature = 1.0) {
         // Run the update on the network for k times, using the marginal
         // conditional distributions. This acts on the hidden and state vectors,
         // updating the notify
 
         notify_on_run_begin();
         for (unsigned int k_it = 0; k_it < k; ++k_it) {
-            sample_hidden(this->visible, this->hidden, true);
-            sample_visible(this->visible, this->hidden, (k_it < k-1)? true : activate_final);
+            sample_hidden(this->visible, this->hidden, true, temperature);
+            sample_visible(this->visible, this->hidden, (k_it < k-1)? true : activate_final, temperature);
         }
 
         notify_on_run_end();
@@ -164,7 +168,7 @@ public:
         unsigned int batch_size,
         double lr,
         int k /* K parameter of the contrastive divergence algorithm. */,
-        double decay = 1e-3
+        double decay = 1e-4
     ) {
         int num_samples = data.size();
 
@@ -208,8 +212,8 @@ public:
                     notify_loss(loss);
                 }
 
-                // This is the positive phase, DO NOT Sample the hidden states!
-                sample_hidden(batch_visible, batch_hidden, /* do_sample */ false);
+                // This is the positive phase, DO  Sample the hidden states!
+                sample_hidden(batch_visible, batch_hidden, /* do_sample */ true);
 
                 // NOW we use CD-K to compute the negative phase. 
                 negative_batch_hidden = batch_hidden;
@@ -224,12 +228,12 @@ public:
                 // Apply the positive and negative updates, noting that when we multiply
                 // together the hidden and visible states we are effectively accumulating the
                 // update over the entire batch and we need to normalize by /batch_size
-                // weights += lr * (batch_visible * batch_hidden.transpose()) / batch_size;
+                weights += lr * (batch_visible * batch_hidden.transpose()) / batch_size;
                 b_v += lr * batch_visible.rowwise().mean();
                 b_h += lr * batch_hidden.rowwise().mean();
 
                 // negative phase
-                // weights -= lr * (negative_batch_visible * negative_batch_hidden.transpose()) / batch_size;
+                weights -= lr * (negative_batch_visible * negative_batch_hidden.transpose()) / batch_size;
                 b_v -= lr * negative_batch_visible.rowwise().mean();
                 b_h -= lr * negative_batch_hidden.rowwise().mean();
                 weights *= (1 - lr * decay);
@@ -239,6 +243,32 @@ public:
     }
 
     void notify_loss(double loss) {
+
+    }
+
+    void map_into_hidden(
+        const VectorCollection<Vector>& data_input,
+        VectorCollection<Vector>& data_output,
+        unsigned int batch_size
+    ) {
+
+        Matrix batch_visible(nv, batch_size);
+        Matrix batch_hidden(nh, batch_size);
+
+        // Do not shuffle the dataset, this is not about SGD. 
+        for (auto batch : data_input.batches(batch_size)) {
+
+            // First we build the batched input matrix (Note that the i iterations are
+            // batch local indices, not global indices!)
+            for (int i = 0; i < batch_size; ++i) {
+                batch_visible.col(i) = batch.x_of(i);
+            }
+            sample_hidden(batch_visible, batch_hidden, false);
+
+            for (int i = 0; i < batch_size; ++i) {
+                data_output.add_sample(batch_hidden.col(i), batch.id_of(i));
+            }
+        }
 
     }
 
@@ -273,6 +303,21 @@ public:
         auto ctx = p.context();
         ctx.set_title("Kernel").show_heatmap(weights.col(hidden_index).data(), width, height, "gray");
     }
+
+    void plot_higher_order_kernel(Plotter& p, unsigned int hidden_index, unsigned int width,
+        unsigned int height, RestrictedBoltzmannMachine<FloatingType>& machine) {
+        // Use this as a weighted linear combination of the kernels ofthe higher order machine
+        auto& higher_weights_mat = machine.get_weights();
+
+        // NOTE: The matrix of the higher order is (visible_higher x hidden_higher )
+        // and the matrix of the lower order is (hidden_higher, hidden_lower ) so we take 
+        // a mat multiplication. 
+
+        Vector weighted_sum = higher_weights_mat * weights.col(hidden_index);
+        auto ctx = p.context();
+        ctx.set_title("Higher Kernel").show_heatmap(weighted_sum.data(), width, height, "gray");
+    }
+
 
     void notify_energy() {
 

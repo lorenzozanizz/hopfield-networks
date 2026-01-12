@@ -210,7 +210,7 @@ public:
 		}
 
 		PlottingContext& show_discrete_categories(std::vector<int> buffer, int width, int height,
-			int num_categories) {
+			int num_categories, bool zero_black=false) {
 
 			pipe.send_line("set yrange [*:*] reverse");
 			pipe.send_line("unset key");
@@ -218,13 +218,17 @@ public:
 			pipe.send_line("set palette maxcolors " + std::to_string(num_categories));
 			pipe.send_line("set palette defined ( \\");
 			for (int i = 0; i < num_categories - 1; ++i) {
-				pipe.send_line(std::to_string(i) + " \"" + random_color() + "\", \\");
+				if (i == 0 && zero_black)
+					pipe.send_line("0  \"#000000\", \\");
+				else
+					pipe.send_line(std::to_string(i) + " \"" + random_color() + "\", \\");
 			}
 			pipe.send_line(std::to_string(num_categories-1) + " \"" + random_color() + "\")");
+			std::cout << "set cbtics 0,1," + std::to_string(num_categories) << std::endl;
 			pipe.send_line("set cbtics 0,1," + std::to_string(num_categories));
 			auto raw_pipe = pipe.raw();
 			pipe.send_line("plot '-' matrix with image");
-			for (int i = 0; i < width; ++i) {
+			for (int i = 0; i < height; ++i) {
 				for (int j = 0; j < width; ++j)
 					fprintf(raw_pipe, "%d ", buffer[i * width + j]);
 				fprintf(raw_pipe, "\n");
@@ -324,8 +328,17 @@ public:
 			// Make spin locking a bit loose...
 			std::this_thread::sleep_for(std::chrono::milliseconds(300));
 		} while (!(v == "continue") && !(v == "clear"));
+
+		clear_all_plots();
+
 	}
 protected:
+
+	void clear_all_plots() {
+		for (int i = 1; i < this->plot_id; ++i) {
+			this->pipe.send_line("set terminal wxt " + std::to_string(i) + " close");
+		}
+	}
 
 
 	// Utility function to write the stream of data in the gnuplot
