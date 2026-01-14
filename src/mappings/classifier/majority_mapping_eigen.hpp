@@ -10,6 +10,7 @@
 #include <random>
 #include <limits>
 #include <Eigen/Dense>
+#include <stdexcept>
 #include "../konohen_mapping_eigen.hpp"
 #include "../../io/datasets/dataset_eigen.hpp"
 #include "../../io/plot/plot.hpp"
@@ -70,22 +71,49 @@ public:
 	// Pass a labeled set of data in order to classify the neurons of the trained map
 	void classify(const DatasetEigen<DataType, int>& dataset) { 
 
+		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
+
+		std::cout << " classifing..." << "\n";
+		std::cout << " dataset size : " << dataset.size() << "\n\n";
+
 		for (size_t i = 0; i < dataset.size(); ++i) {
 
 			// input vector
 			const auto& x = dataset.x_of(i);
-
 			// true label
 			int label_id = dataset.y_of(i);
-
+			std::cout << "label: " << label_id << "\n";
 			// BMU
 			int neuron_idx = trained_map.map(x);
 
-			std::cout << "data: " << x << "\n label: " << labels_map[label_id] << " and bmu: " << trained_map.get_weights(neuron_idx) << "\n";
-			std::cout << "before " << hits_map[neuron_idx] << "\n\n";
 			// update hit counter
-			hits_map[neuron_idx](label_id) += 1;
-			std::cout << "after " << hits_map[neuron_idx] << "\n\n";
+			for (size_t i = 0; i < dataset.size(); ++i) {
+
+				const auto& x = dataset.x_of(i);
+				int label_id = dataset.y_of(i);
+
+				int neuron_idx = trained_map.map(x);
+
+				if (neuron_idx < 0 || neuron_idx >= num_neurons) {
+					throw std::out_of_range(
+						"Invalid BMU index: " + std::to_string(neuron_idx)
+					);
+				}
+
+				if (label_id == -1) {
+					continue;  // explicitly ignored label
+				}
+
+				if (label_id < 0 || label_id >= static_cast<int>(labels_map.size())) {
+					throw std::out_of_range(
+						"Invalid label id: " + std::to_string(label_id)
+					);
+				}
+
+				hits_map[neuron_idx](label_id) += 1;
+			}
+
+			
 		}
 
 		// assign labels to neurons
@@ -103,7 +131,7 @@ public:
 		for (int j = 0; j < height; ++j) {
 			for (int i = 0; i < width; ++i) {
 
-				std::cout << "label at ( " << i << ", " << j <<" ) is " << map_neuron_label(i, j) << "\n\n";
+				//std::cout << "label at ( " << i << ", " << j <<" ) is " << map_neuron_label(i, j) << "\n\n";
 
 
 			}
@@ -132,16 +160,16 @@ public:
 		Eigen::VectorXd labels = hits_map[idx];
 		Eigen::Index maxIdx;
 
-		std::cout << "labels " << labels << "\n\n";
+		//std::cout << "labels " << labels << "\n\n";
 
 		int total = labels.sum();
 		if (total == 0) return -1;
 
-		std::cout << "sum " << total << "\n\n";
+		//std::cout << "sum " << total << "\n\n";
 
 		float max = labels.maxCoeff(&maxIdx);
 
-		std::cout << "max  " << max  << " and coefficient "<< maxIdx << "\n\n";
+		//std::cout << "max  " << max  << " and coefficient "<< maxIdx << "\n\n";
 
 		if (max >= threshold * total) {
 			return maxIdx;
@@ -164,10 +192,6 @@ public:
 				labels[from_xy_to_idx(i,j)] = lbl + 1;
 			}
 		}
-		
-		for (int i = 0; i < width * height; ++i)
-			std::cout << labels[i] << " ";
-		std::cout << std::endl;
 		plotter.context()
 			.set_title("SOM Classification Map")
 			.show_discrete_categories(labels, trained_map.get_map_width(),

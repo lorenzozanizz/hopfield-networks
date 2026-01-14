@@ -1092,7 +1092,7 @@ void clustering_test_eigen() {
 	// Parameters
 	unsigned int input_size = 10;       // each input vector has 3 features
 	unsigned int iterations = 500;
-	double learning_rate = 0.5;
+	double learning_rate = 0.01;
 
 
 	// Parameters
@@ -1113,11 +1113,11 @@ void clustering_test_eigen() {
 	km.initialize(42);
 
 	std::vector<Eigen::VectorXd> data;
-	data.reserve(10);
+	data.reserve(15);
 	for (int i = 0; i < 5; ++i) {
 		Eigen::VectorXd vec(input_size);
 		for (int j = 0; j < input_size; ++j) {
-			vec(j) = 2;  // same values as before
+			vec(j) = 1;  // same values as before
 		}
 		data.push_back(vec);
 	}
@@ -1133,14 +1133,14 @@ void clustering_test_eigen() {
 	for (int i = 10; i < 15; ++i) {
 		Eigen::VectorXd vec(input_size);
 		for (int j = 0; j < input_size; ++j) {
-			vec(j) = 8;  // same values as before
+			vec(j) = 110;  // same values as before
 		}
 		data.push_back(vec);
 	}
 
 	km.train(data, iterations, nf, learning_rate);
 
-	UClusteringEigen<double> UMap(km, 0.4);
+	UClusteringEigen<double> UMap(km, 0.2);
 	UMap.compute();
 	Plotter plotter;
 	UMap.plot(plotter);
@@ -1149,13 +1149,17 @@ void clustering_test_eigen() {
 
 using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
 void classification_MNIST() {
-	VectorDataset<IntVector, unsigned int> mnist(100);
-	DatasetRepo::load_mnist_eigen("C:/Users/tomma/HPC/AMSC/Boltzmann-Network/proj/hopfield-networks/build/vector_mnist.data", 400, mnist);
 
+	// Some problems with loading MNIST!! The labels are weird, look at it by running this
+	VectorDataset<IntVector, unsigned int> mnist(50);
+	DatasetRepo::load_mnist_eigen("vector_mnist.data", 50, mnist);
+	for (int i = 0; i < 50; ++i) {
+		std::cout << "index i: " << i << " label: " << mnist.y_of(i) << "\n";
+	}
 	// Parameters
 	unsigned int input_size = 28*28;       // each input vector has 3 features
 	unsigned int iterations = 300;
-	double learning_rate = 0.5;
+	double learning_rate = 0.02;
 
 
 	// Parameters
@@ -1179,37 +1183,47 @@ void classification_MNIST() {
 	km.initialize(42);
 
 	std::vector<Eigen::VectorXd> data_double;
-	data_double.reserve(50);
+	data_double.reserve(45);
 
-	for (const auto& v : mnist.get_n_elements_data(50)) {
+	for (const auto& v : mnist.get_n_elements_data(45)) {
 		data_double.push_back(v.cast<double>());
 	}
 
 	km.train(data_double, iterations, nf, learning_rate);
 	
 	std::map<int, std::string> labels_map;
-	labels_map[0] = "zero";
-	labels_map[1] = "one";
-	labels_map[2] = "two";
-	labels_map[3] = "three";
-	labels_map[4] = "four";
-	labels_map[5] = "five";
-	labels_map[6] = "six";
-	labels_map[7] = "seven";
-	labels_map[8] = "eight";
-	labels_map[9] = "nine";
+	labels_map[0] = "unknown";
+	labels_map[1] = "zero";
+	labels_map[2] = "one";
+	labels_map[3] = "two";
+	labels_map[4] = "three";
+	labels_map[5] = "four";
+	labels_map[6] = "five";
+	labels_map[7] = "six";
+	labels_map[8] = "seven";
+	labels_map[9] = "eight";
+	labels_map[10] = "nine";
 	
 	
 	MajorityMappingEigen<double> classifier(km, 0.6, labels_map);
 
-	DatasetEigen<double, int> dataset(50);
-
-	for (int i = 50; i < dataset.size(); ++i) {
+	DatasetEigen<double, int> dataset(input_size);
+	for (int i = 45; i < 50; ++i) {
 		dataset.add_sample(mnist.x_of(i).cast<double>(), mnist.y_of(i));
 	}
 	
+	try {
+		classifier.classify(dataset);
+	}
+	catch (const std::out_of_range& e) {
+		std::cerr << "Classification error: " << e.what() << std::endl;
+		throw;
+	}
+	catch (const std::exception& e) {
+		std::cerr << "Unexpected error: " << e.what() << std::endl;
+		throw;
+	}
 
-	classifier.classify(dataset);
 
 	Plotter plotter;
 	classifier.plot(plotter);
@@ -1219,20 +1233,20 @@ void classification_MNIST() {
 using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
 void clustering_MNIST() {
 
-	VectorDataset<IntVector, unsigned int> mnist(400); 
-	DatasetRepo::load_mnist_eigen("C:/Users/tomma/HPC/AMSC/Boltzmann-Network/proj/hopfield-networks/build/vector_mnist.data", 400, mnist);
+	VectorDataset<IntVector, unsigned int> mnist(100); 
+	DatasetRepo::load_mnist_eigen("vector_mnist.data", 100, mnist);
 
 	// Parameters
-	unsigned int input_size = 28*28;       // each input vector has 3 features
+	unsigned int input_size = 28 * 28;
 	unsigned int iterations = 500;
-	double learning_rate = 0.8;
+	double learning_rate = 0.2;
 
 
 	// Parameters
-	double sigma0 = 2.0;
-	double tau = 10.0;
-	unsigned int map_width = 5;
-	unsigned int map_height = 5;
+	double sigma0 = 3.0;
+	double tau = 13;
+	unsigned int map_width = 15;
+	unsigned int map_height = 15;
 	std::string evolving_func = "exponential";
 
 	KonohenMapEigen<double> km(map_width, map_height, input_size);
@@ -1264,14 +1278,18 @@ void clustering_MNIST() {
 // Just create the folder...
 int main() {
 	//test_2D_konohen_map_Eigen();
-	classification_test_Eigen();
-	clustering_MNIST();
+	//classification_test_Eigen();
+	//clustering_MNIST();
 	//classification_MNIST();
-	//Eigen::initParallel();
-	//Eigen::setNbThreads(std::thread::hardware_concurrency());
+	//clustering_test_eigen();
+	Eigen::initParallel();
+	Eigen::setNbThreads(std::thread::hardware_concurrency());
+	//clustering_MNIST();
+	classification_MNIST();
+
 	// classification_test();
 
-	boltzmann_compile();
+	//boltzmann_compile();
 	// autograd_compile();
 	/*
 	autograd_compile();
