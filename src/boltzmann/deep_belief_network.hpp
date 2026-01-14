@@ -6,7 +6,6 @@ template <typename FloatingType>
 class StackedRBM {
 	
 
-
 };
 
 #endif
