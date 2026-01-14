@@ -73,9 +73,6 @@ public:
 
 		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
 
-		std::cout << " classifing..." << "\n";
-		std::cout << " dataset size : " << dataset.size() << "\n\n";
-
 		for (size_t i = 0; i < dataset.size(); ++i) {
 
 			// input vector

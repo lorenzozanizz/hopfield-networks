@@ -73,30 +73,15 @@ public:
 	};
 
 	double neighb_mean(int x, int y) {
-		double sum = 0.0;
-		int count = 0;
-		for (int dy = -1; dy <= 1; ++dy) {
-			for (int dx = -1; dx <= 1; ++dx) {
-				int nx = x + dx;
-				int ny = y + dy;
 
-				if (nx > 0 && nx < u_width && ny > 0 && ny < u_heigth) {
-					sum += u(nx, ny);
-					++count;
-				}
-			}
-		}
-		return sum / count;
-	}
+		int xmin = std::max(0, x - 1);
+		int xmax = std::min(static_cast<int>(u_width) - 1, x + 1);
+		int ymin = std::max(0, y - 1);
+		int ymax = std::min(static_cast<int>(u_heigth) - 1, y + 1);
 
-	// WARNING! This is just for some tests
-	void print_map() {
-		for (int y = 0; y < u_heigth; ++y) {
-			for (int x = 0; x < u_width; ++x) {
-				std::cout << "(" << x << ", " << y << "): " << u(x, y);
-			}
-			std::cout << "\n";
-		}
+		return u.block(ymin, xmin,
+			ymax - ymin + 1,
+			xmax - xmin + 1).mean();
 	}
 
 

@@ -388,16 +388,17 @@ public:
 	KonohenMapEigen(unsigned int cortex_size, unsigned int input_size) :
 		mapping_cortex_width(cortex_size), mapping_cortex_height(1), stimulus_cortex_input_size(input_size) {
 		dim = ONE_D;
-		allocate();
+		
 	}
 
 	KonohenMapEigen(unsigned int cortex_width, unsigned int cortex_height, unsigned int input_size) :
 		mapping_cortex_width(cortex_width), mapping_cortex_height(cortex_height), stimulus_cortex_input_size(input_size) {
 		dim = TWO_D;
-		allocate();
+		
 	}
 
 	void initialize(unsigned long long seed) {
+		allocate();
 		std::mt19937 rng(seed);
 		std::uniform_real_distribution<DataType> dist(0.0, 1.0);
 		// assigning for each neuron's component a random value from 0.0 to 1.0
@@ -406,15 +407,12 @@ public:
 				weight_vectors(j, i) = dist(rng);
 			}
 		}
-
 	}
 
 
-	/*
 	void initialize() {
-		weight_vectors = Eigen::MatrixXd::Random(mapping_cortex_width * mapping_cortex_height, stimulus_cortex_input_size);
+		weight_vectors = Eigen::MatrixXd::Random(stimulus_cortex_input_size, mapping_cortex_width * mapping_cortex_height);
 	}
-	*/
 	
 
 	const int get_input_size() const {
@@ -429,17 +427,16 @@ public:
 		return mapping_cortex_height;
 	}
 
-	Eigen::VectorXd get_weights(unsigned int neuron_idx) const {
+	Eigen::MatrixXd::ConstColXpr get_weights(unsigned int neuron_idx) const {
 		return weight_vectors.col(neuron_idx);
 	}
 
-	Eigen::VectorXd get_weights(unsigned int x, unsigned int y) const { 
-		return weight_vectors.col(x + y*mapping_cortex_width);
+	Eigen::MatrixXd::ConstColXpr get_weights(unsigned int x, unsigned int y) const {
+		return weight_vectors.col(x + y * mapping_cortex_width);
 	}
 
-
 	// This function receives a collection of datavectors and has to train the mapping cortex
-	void train(const std::vector<Eigen::VectorXd> data,
+	void train(const std::vector<Eigen::VectorXd>& data,
 		unsigned int iterations,
 		NeighbouringFunctionEigen& nf,
 		double learning_rate = 0.1) {
@@ -486,72 +483,10 @@ public:
 		}
 	}
 
-	/*
-	// This function receives a collection of datavectors and has to train the mapping cortex
-	void train(const std::vector<IntVector> data,
-		unsigned int iterations,
-		NeighbouringFunctionEigen& nf,
-		double learning_rate = 0.1) {
-
-		for (unsigned int t = 0; t < iterations; t++) {
-			for (const auto& input : data) {
-
-				// find best matching unit
-				unsigned int bmu = map(input);
-
-				if (dim == ONE_D) {
-
-					// iterate over neighbors of BMU
-					for (auto it = nf.begin(bmu); it != nf.end(bmu); ++it) {
-						unsigned int idx = it.index();
-						double h = it.contribution_weight();
-
-						// update weights of neuron idx
-						weight_vectors.col(idx) += learning_rate * h * (input - weight_vectors.col(idx));
-
-					}
-
-				}
-				else if (dim == TWO_D) {
-
-					int bmu_x = x_from_idx(bmu);
-					int bmu_y = y_from_idx(bmu);
-
-					// iterate over neighbors of BMU
-					for (auto it = nf.begin(bmu_x, bmu_y); it != nf.end(bmu_x, bmu_y); ++it) {
-
-						unsigned int idx = it.index();
-						double h = it.contribution_weight();
-						// update weights of neuron idx
-						weight_vectors.col(idx) += learning_rate * h * (input - weight_vectors.col(idx));
-
-					}
-
-				}
-
-			}
-			// evolve neighborhood radius
-			nf.evolve_sigma(t);
-		}
-	}
-	*/
-
-
 	unsigned int map(const Eigen::VectorXd& x) const {
 		
 		unsigned int winner = 0;
-		double min_dist = std::numeric_limits<double>::max();
-
-		for (int i = 0; i < weight_vectors.cols(); ++i) {
-
-			double dist = (weight_vectors.col(i) - x).squaredNorm();
-
-			if (dist < min_dist) {
-				min_dist = dist;
-				winner = i;
-			}
-		}
-
+		(weight_vectors.colwise() - x).colwise().norm().minCoeff(&winner);
 		return winner;
 
 	}
