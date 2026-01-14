@@ -44,6 +44,7 @@ namespace DatasetRepo {
 		std::string line;
 		int file_amount = 0;
 		unsigned int read_amt = 0;
+		unsigned int collected_keys = 0;
 
 		// Read "amount: N" 
 		if (std::getline(in, line)) {
@@ -54,27 +55,30 @@ namespace DatasetRepo {
 
 		DataVector<DataType> vector(28 * 28);
 		while (std::getline(in, line)) {
+			// THIS WAS UPDATED TO FIX A BUG IN WHICH LABELS WOULD GET MESSED UP
 			// Skip away empty lines and comments 
 			unsigned int id, label;
-			if (line.empty() || line.rfind("#", 0) == 0) continue;
-			// --- id --- 
-			{
+			std::string dummy;
+
+			if (line.empty() || line.rfind("#", 0) == 0 || line.rfind("\n", 0) == 0)
+				continue;
+			else if (line.rfind("label", 0) == 0) {
+				// --- Label line parsing 
 				std::istringstream iss(line);
-				std::string dummy;
-				iss >> dummy >> id; // dummy = "id:"
-			}
-			// --- label ---
-			std::getline(in, line);
-			{
-				std::istringstream iss(line);
-				std::string dummy;
 				iss >> dummy >> label; // dummy = "label:" 
+				collected_keys += 1;
 			}
-			// --- data --- 
-			std::getline(in, line);
-			{
+			else if (line.rfind("id", 0) == 0) {
+				// --- Id line parsing
 				std::istringstream iss(line);
-				std::string dummy; iss >> dummy;
+				iss >> dummy >> id; // dummy = "id:"
+				collected_keys += 1;
+			}
+			else if (line.rfind("data", 0) == 0) {
+				// --- Data line parsing
+				collected_keys += 1;
+				std::istringstream iss(line);
+				iss >> dummy;
 				// "data:" 
 				DataType value;
 				for (int i = 0; i < 28 * 28; ++i) {
@@ -86,12 +90,17 @@ namespace DatasetRepo {
 					vector(i) = value;
 				}
 			}
-		
 
-			entries.add_sample(vector, label, id);
-			read_amt++;
-			if (read_amt >= amount)
-				break;
+			if (collected_keys == 3) {
+				// Reset the MNIST image reading context, to allow for variable order
+				// of data storage. 
+				collected_keys = 0;
+
+				entries.add_sample(vector, label, id);
+				read_amt++;
+				if (read_amt >= amount)
+					break;
+			}
 		}
 	}
 

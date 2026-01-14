@@ -1151,19 +1151,19 @@ using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
 void classification_MNIST() {
 
 	// Some problems with loading MNIST!! The labels are weird, look at it by running this
-	VectorDataset<IntVector, unsigned int> mnist(50);
-	DatasetRepo::load_mnist_eigen("vector_mnist.data", 50, mnist);
+	VectorDataset<IntVector, unsigned int> mnist(100);
+	DatasetRepo::load_mnist_eigen("vector_mnist.data", 100, mnist);
 	for (int i = 0; i < 50; ++i) {
-		std::cout << "index i: " << i << " label: " << mnist.y_of(i) << "\n";
+	// 	std::cout << "index i: " << i << " label: " << mnist.y_of(i) << "\n";
 	}
 	// Parameters
 	unsigned int input_size = 28*28;       // each input vector has 3 features
 	unsigned int iterations = 300;
-	double learning_rate = 0.02;
+	double learning_rate = 0.10;
 
 
 	// Parameters
-	double sigma0 = 2.0;
+	double sigma0 = 3.0;
 	double tau = 10.0;
 	unsigned int map_width = 10;
 	unsigned int map_height = 10;
@@ -1183,9 +1183,9 @@ void classification_MNIST() {
 	km.initialize(42);
 
 	std::vector<Eigen::VectorXd> data_double;
-	data_double.reserve(45);
+	data_double.reserve(100);
 
-	for (const auto& v : mnist.get_n_elements_data(45)) {
+	for (const auto& v : mnist.get_n_elements_data(100)) {
 		data_double.push_back(v.cast<double>());
 	}
 
@@ -1227,6 +1227,15 @@ void classification_MNIST() {
 
 	Plotter plotter;
 	classifier.plot(plotter);
+
+	// Scegli circa 10 kernel a caso da plottare, dovrebbero approssimare le immagini
+	// del mnist in una certa misura, se sono rumore a caso allora qualcosa sicuramente non va. 
+	for (int i = 0; i < 10 * 10; i += 9) {
+		plotter.context().show_heatmap(km.get_weights(i).data(), 28, 28, "gray");
+	}
+	// Se non è chiaro perchè vengono fuori delle foto di numeri quando plotti i pesi, dimmelo
+	// che è importante!!!!!!!!!! 
+	plotter.block();
 
 }
 
