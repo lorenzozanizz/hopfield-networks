@@ -416,15 +416,15 @@ using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
 void classification_MNIST() {
 
 	// Some problems with loading MNIST!! The labels are weird, look at it by running this
-	VectorDataset<IntVector, unsigned int> mnist(100);
-	DatasetRepo::load_mnist_eigen("vector_mnist.data", 100, mnist);
+	VectorDataset<IntVector, unsigned int> mnist(400);
+	DatasetRepo::load_mnist_eigen("vector_mnist.data", 400, mnist);
 	std::cout << "ECCOMI" << std::endl;
-	for (int i = 0; i < 50; ++i) {
+	for (int i = 0; i < 400; ++i) {
 	 	std::cout << "index i: " << i << " label: " << mnist.y_of(i) << "\n" << std::endl;
 	}
 	// Parameters
 	unsigned int input_size = 28*28;       // each input vector has 3 features
-	unsigned int iterations = 300;
+	unsigned int iterations = 100;
 	double learning_rate = 0.10;
 
 
@@ -451,7 +451,7 @@ void classification_MNIST() {
 	std::vector<Eigen::VectorXd> data_double;
 	data_double.reserve(100);
 
-	for (const auto& v : mnist.get_n_elements_data(100)) {
+	for (const auto& v : mnist.get_n_elements_data(400)) {
 		data_double.push_back(v.cast<double>());
 	}
 
@@ -474,7 +474,7 @@ void classification_MNIST() {
 	MajorityMappingEigen<double> classifier(km, 0.6, labels_map);
 
 	DatasetEigen<double, int> dataset(input_size);
-	for (int i = 45; i < 50; ++i) {
+	for (int i = 0; i < 400; ++i) {
 		dataset.add_sample(mnist.x_of(i).cast<double>(), mnist.y_of(i));
 	}
 	
@@ -570,8 +570,8 @@ int main() {
 	//clustering_test_eigen();
 	Eigen::initParallel();
 	Eigen::setNbThreads(std::thread::hardware_concurrency());
-	clustering_MNIST(); 
-	//classification_MNIST();
+	// clustering_MNIST(); 
+	classification_MNIST();
 
 	// classification_test();
 

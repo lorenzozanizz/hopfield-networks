@@ -73,67 +73,25 @@ public:
 
 		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
 
+		// Here we compute the required histogram. 
 		for (size_t i = 0; i < dataset.size(); ++i) {
-
-			// input vector
 			const auto& x = dataset.x_of(i);
-			// true label
 			int label_id = dataset.y_of(i);
-			std::cout << "label: " << label_id << "\n";
-			// BMU
+
 			int neuron_idx = trained_map.map(x);
 
-			// update hit counter
-			for (size_t i = 0; i < dataset.size(); ++i) {
-
-				const auto& x = dataset.x_of(i);
-				int label_id = dataset.y_of(i);
-
-				int neuron_idx = trained_map.map(x);
-
-				if (neuron_idx < 0 || neuron_idx >= num_neurons) {
-					throw std::out_of_range(
-						"Invalid BMU index: " + std::to_string(neuron_idx)
-					);
-				}
-
-				if (label_id == -1) {
-					continue;  // explicitly ignored label
-				}
-
-				if (label_id < 0 || label_id >= static_cast<int>(labels_map.size())) {
-					throw std::out_of_range(
-						"Invalid label id: " + std::to_string(label_id)
-					);
-				}
-
-				hits_map[neuron_idx](label_id) += 1;
-			}
-
-			
+			hits_map[neuron_idx](label_id) += 1;
 		}
 
 		// assign labels to neurons
 		int width = trained_map.get_map_width();
 		int height = trained_map.get_map_height();
 
-		for (int j = 0; j < height; ++j) {
-			for (int i = 0; i < width; ++i) {
-
+		for (int j = 0; j < height; ++j) 
+			for (int i = 0; i < width; ++i) 
+				// This function implicitly uses our hits map (histogram of the imputations)
 				map_neuron_label(i, j) = most_frequent_hit(from_xy_to_idx(i, j));
 
-			}
-		}
-
-		for (int j = 0; j < height; ++j) {
-			for (int i = 0; i < width; ++i) {
-
-				//std::cout << "label at ( " << i << ", " << j <<" ) is " << map_neuron_label(i, j) << "\n\n";
-
-
-			}
-		}
-	
 	}
 
 	// Warning! You can call this fuction only after calling classify()!
@@ -153,20 +111,14 @@ public:
 	// This function takes the index of a neuron and returns the index of the label of its most frequent hits if that is grater
 	// than the set threshold. Otherwise is returned -1, that happens if a neuron is hitted by several different data or if it's not hit at all.
 	int most_frequent_hit(int idx) {
-
-		Eigen::VectorXd labels = hits_map[idx];
+		Eigen::VectorXd& labels = hits_map[idx];
 		Eigen::Index maxIdx;
-
 		//std::cout << "labels " << labels << "\n\n";
 
 		int total = labels.sum();
 		if (total == 0) return -1;
 
-		//std::cout << "sum " << total << "\n\n";
-
 		float max = labels.maxCoeff(&maxIdx);
-
-		//std::cout << "max  " << max  << " and coefficient "<< maxIdx << "\n\n";
 
 		if (max >= threshold * total) {
 			return maxIdx;
@@ -185,8 +137,12 @@ public:
 		for (int j = 0; j < height; ++j) {
 			for (int i = 0; i < width; ++i) {
 				int lbl = map_neuron_label(i, j);
-				if (lbl < 0) lbl = -1; //unknown class
+				if (lbl < 0) lbl = -1; 
+				// Negative labels imply classes which are unknown or which the mapping
+				// could not compute
 				labels[from_xy_to_idx(i,j)] = lbl + 1;
+				// We sum 1 because our plotting function assumes discrete 0, ... N categories
+				// so now 0: unknown = BLACK color
 			}
 		}
 		plotter.context()

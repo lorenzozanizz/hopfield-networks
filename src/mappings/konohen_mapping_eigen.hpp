@@ -8,10 +8,10 @@
 #include <vector>
 #include <random>
 #include <limits>
-#include <Eigen/Dense>
+
 #include "../math/utilities.hpp"
 #include "../math/matrix/matrix_ops.hpp"
-
+#include "../io/io_utils.hpp"
 
 // Enum that describes which evolving function to use on sigma
 enum evolving_function {
@@ -441,7 +441,9 @@ public:
 		NeighbouringFunctionEigen& nf,
 		double learning_rate = 0.1) {
 
+		MultiProgressBar prog_bar(iterations);
 		for (unsigned int t = 0; t < iterations; t++) {
+			prog_bar.update(t);
 			for (const auto& input : data) {
 
 				// find best matching unit
@@ -484,7 +486,6 @@ public:
 	}
 
 	unsigned int map(const Eigen::VectorXd& x) const {
-		
 		unsigned int winner = 0;
 		(weight_vectors.colwise() - x).colwise().norm().minCoeff(&winner);
 		return winner;
