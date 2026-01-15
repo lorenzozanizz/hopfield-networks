@@ -7,7 +7,6 @@ set(CMAKE_Fortran_COMPILER ${GFORTRAN_EXECUTABLE})
 
 project(project_title LANGUAGES CXX C Fortran)
 
-add_executable(main "src/main.cpp")
 # add_executable(prog "src/math/autograd/math.f90")
 
 find_program(GNUPLOT_EXECUTABLE gnuplot)
@@ -33,5 +32,14 @@ endif()
 
 find_package(OpenMP REQUIRED)
 find_package(Eigen3 REQUIRED) 
+
+# Merge all the cpp files in a single executable library. 
+add_library(executables "src/utils/timing.cpp")
+
+add_executable(main "src/main.cpp")
+
+# Link all the executables for the application. 
+target_link_libraries(main PRIVATE executables)
+
 target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(main PRIVATE Eigen3::Eigen)

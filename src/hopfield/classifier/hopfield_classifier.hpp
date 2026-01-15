@@ -12,8 +12,6 @@
 // acts as a selector repositories between a set of known mappings state->categories.
 
 class HopfieldClassifier {
-
-
 	// Assume for simplicity that the labels are positve integers, as the
 	// majority of cases. 
 	using Category = int;

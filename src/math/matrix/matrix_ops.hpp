@@ -7,10 +7,12 @@
 #include <cmath>
 #include <fstream>
 
-
+//
 #define EIGEN_USE_THREADS 
 #undef EIGEN_DONT_PARALLELIZE
 #define EIGEN_USE_OPENMP
+
+
 #include <Eigen/Core>
 #include <Eigen/Core>
 #include <Eigen/Dense>

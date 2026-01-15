@@ -18,7 +18,6 @@ class HebbianCrossTalkTermVisualizer {
 	Plotter& plotter;
 	bool did_compute;
 
-
 public:
 
 	void compute_cross_talk_view(BinaryState& reference, std::initializer_list<BinaryState*> init) {
