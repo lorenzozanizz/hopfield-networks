@@ -418,8 +418,9 @@ void classification_MNIST() {
 	// Some problems with loading MNIST!! The labels are weird, look at it by running this
 	VectorDataset<IntVector, unsigned int> mnist(100);
 	DatasetRepo::load_mnist_eigen("vector_mnist.data", 100, mnist);
+	std::cout << "ECCOMI" << std::endl;
 	for (int i = 0; i < 50; ++i) {
-	 	std::cout << "index i: " << i << " label: " << mnist.y_of(i) << "\n";
+	 	std::cout << "index i: " << i << " label: " << mnist.y_of(i) << "\n" << std::endl;
 	}
 	// Parameters
 	unsigned int input_size = 28*28;       // each input vector has 3 features
@@ -509,6 +510,10 @@ void clustering_MNIST() {
 
 	VectorDataset<IntVector, unsigned int> mnist(100); 
 	DatasetRepo::load_mnist_eigen("vector_mnist.data", 100, mnist);
+
+	for (int i = 0; i < 50; ++i) {
+		std::cout << "index i: " << i << " label: " << mnist.y_of(i) << "\n" << std::endl;
+	}
 
 	// Parameters
 	unsigned int input_size = 28 * 28;

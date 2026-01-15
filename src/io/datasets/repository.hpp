@@ -53,12 +53,15 @@ namespace DatasetRepo {
 			iss >> dummy >> file_amount;
 		}
 
+		// Variables to temporarily fill while reading the file
 		DataVector<DataType> vector(28 * 28);
+		vector.setZero();
+		unsigned int id, label;
+		std::string dummy;
+
 		while (std::getline(in, line)) {
 			// THIS WAS UPDATED TO FIX A BUG IN WHICH LABELS WOULD GET MESSED UP
 			// Skip away empty lines and comments 
-			unsigned int id, label;
-			std::string dummy;
 
 			if (line.empty() || line.rfind("#", 0) == 0 || line.rfind("\n", 0) == 0)
 				continue;
@@ -102,6 +105,8 @@ namespace DatasetRepo {
 					break;
 			}
 		}
+
+		in.close();
 	}
 
 
