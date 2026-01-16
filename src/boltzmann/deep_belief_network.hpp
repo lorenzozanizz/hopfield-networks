@@ -10,6 +10,8 @@
 #include "../io/datasets/dataset.hpp"
 // Import Eigen needed for the operations. 
 #include "../math/matrix/matrix_ops.hpp"
+// We need autograd to perform fine-tuning when needed.
+#include "../math/autograd/variables.hpp"
 
 #include "restricted_boltzmann_machine.hpp"
 #include "boltzmann_logger.hpp"
@@ -66,8 +68,7 @@ public:
 
 	void fine_tune() {
 
-
-
+		
 		// We use the interface for the backpropagation network trainer provided in the
 		// .hpp file: as long as we implement the requested methods, everything is fine. 
 		// NOTE: We mark such methods protected and declare the trainer class a friend. 

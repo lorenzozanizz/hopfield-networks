@@ -415,7 +415,11 @@ io_utils_compile() {
 using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
 void classification_MNIST() {
 
-	// Some problems with loading MNIST!! The labels are weird, look at it by running this
+	
+	// #NOTE: TO HAVE A GOOD REPRESENTATION OF THE CLASSIFICATION MAP,
+	// LOTS OF DATAPOINT ARE REQUIRED (E.G. FOR A 10x10 mapping with 400
+	// we get a decent result, NOTE THAT THE ENTIRE MNIST DATASET THAT WE WILL
+	//USE AT THE END HAS 10.000 DATAPOINTS!
 	VectorDataset<IntVector, unsigned int> mnist(400);
 	DatasetRepo::load_mnist_eigen("vector_mnist.data", 400, mnist);
 	std::cout << "ECCOMI" << std::endl;
@@ -429,6 +433,10 @@ void classification_MNIST() {
 
 
 	// Parameters
+	// #NOTE: personalmente a me confonde un po' tutta sta roba, ma visto che la mappa sembra
+	// funzionare teniamo così e via, documenta però bene i costruttori della evolving func
+	// e in caso alcune configurazioni (tipo lineare) non usano alcuni parametri crea multipli
+	// costruttori
 	double sigma0 = 3.0;
 	double tau = 10.0;
 	unsigned int map_width = 10;
@@ -451,6 +459,9 @@ void classification_MNIST() {
 	std::vector<Eigen::VectorXd> data_double;
 	data_double.reserve(100);
 
+
+	// #NOTE: Questa cosa non serve, basta che carichi i dati in un dataset in double vector, 
+	// invece che in int (la funzione che carica il dataset è templetizzata!)
 	for (const auto& v : mnist.get_n_elements_data(400)) {
 		data_double.push_back(v.cast<double>());
 	}
@@ -472,6 +483,12 @@ void classification_MNIST() {
 	
 	
 	MajorityMappingEigen<double> classifier(km, 0.6, labels_map);
+
+	// Inoltre, non capisco perchè usi un altro datatype per questo dataset,  per giunta
+	// questo nuovo datatype non ha modi per ottenere dei "batch" nel dataset. 
+
+	// Se vuoi sperimentare con la vettorizzazione "massiva" su più batch di input, 
+	// usa le BatchView del VectorDataset di prima, sono a costo 0 (solamente view)
 
 	DatasetEigen<double, int> dataset(input_size);
 	for (int i = 0; i < 400; ++i) {
@@ -501,12 +518,18 @@ void classification_MNIST() {
 	}
 	// Se non è chiaro perchè vengono fuori delle foto di numeri quando plotti i pesi, dimmelo
 	// che è importante!!!!!!!!!! 
+
+	// #note: crea una funzione che visualizza i kernel in questo modo, la mettiamo negli
+	// examples. 
 	plotter.block();
 
 }
 
 using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
 void clustering_MNIST() {
+
+
+	// #note: come prima, qui devi usare un bel po' di dati e.g. 400 / 500 al minimo
 
 	VectorDataset<IntVector, unsigned int> mnist(100); 
 	DatasetRepo::load_mnist_eigen("vector_mnist.data", 100, mnist);
@@ -546,7 +569,6 @@ void clustering_MNIST() {
 	}
 
 	km.train(data_double, iterations, nf, learning_rate);
-
 
 	UClusteringEigen<double> UMap(km, 0.4);
 	UMap.compute();
