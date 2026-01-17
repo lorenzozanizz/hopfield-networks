@@ -12,6 +12,9 @@
 #include "../math/utilities.hpp"
 #include "../math/matrix/matrix_ops.hpp"
 #include "../io/io_utils.hpp"
+#include "../io/plot/plot.hpp"
+#include "../io/plot/gnuplot_wrapper.hpp"
+#include "../io/datasets/dataset.hpp"
 
 // Enum that describes which evolving function to use on sigma
 enum evolving_function {
@@ -215,27 +218,14 @@ public:
 				int next_x, next_y;
 				// checking if the next x will be in the square and checking if the next x will in the map domain
 				if (static_cast<int>(current_x) - static_cast<int>(winner_x) < support && current_x < owner->get_map_width() - 1) {
-
-					//std::cout << " \n Distance: (" << static_cast<int>(current_x) - static_cast<int>(winner_x)
-						//<< " is less than  " << support << " and current x " << current_x << " is less than " << owner->get_map_width() << "\n";
-
 					// if so, we add on x
 					next_x = current_x + 1;
 					next_y = current_y;
 				}
 				else {
-
-					//std::cout << " \n Distance: (" << static_cast<int>(current_x) - static_cast<int>(winner_x)
-						//<< " is more than  " << support << " or current x " << current_x << " is more than " << owner->get_map_width() << "\n";
-
-					// if so, we add on x
-					next_x = current_x + 1;
-					next_y = current_y;
-
 					// if not, we update both y and x
 					next_y = current_y + 1;
 					next_x = std::max(0, static_cast<int>(winner_x) - static_cast<int>(support));
-
 				}
 
 				current_x = next_x;
@@ -353,6 +343,7 @@ public:
 template <typename DataType = float>
 class KonohenMapEigen {
 	using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
+	using DoubleVector = Eigen::Matrix<double, Eigen::Dynamic, 1>; 
 private:
 
 	// This matrix is assigned s.t. every neuron is accessed with its index, 
@@ -436,15 +427,16 @@ public:
 	}
 
 	// This function receives a collection of datavectors and has to train the mapping cortex
-	void train(const std::vector<Eigen::VectorXd>& data,
+	void train(const VectorDataset<DoubleVector, unsigned int>& data,
 		unsigned int iterations,
 		NeighbouringFunctionEigen& nf,
 		double learning_rate = 0.1) {
 
 		MultiProgressBar prog_bar(iterations);
+
 		for (unsigned int t = 0; t < iterations; t++) {
 			prog_bar.update(t);
-			for (const auto& input : data) {
+			for (const auto& input : data.get_data()) {
 
 				// find best matching unit
 				unsigned int bmu = map(input);
@@ -458,14 +450,14 @@ public:
 
 						// update weights of neuron idx
 						weight_vectors.col(idx) += learning_rate * h * (input - weight_vectors.col(idx));
-						
+
 					}
 
 				}
 				else if (dim == TWO_D) {
 
 					int bmu_x = x_from_idx(bmu);
-					int bmu_y = y_from_idx(bmu); 
+					int bmu_y = y_from_idx(bmu);
 
 					// iterate over neighbors of BMU
 					for (auto it = nf.begin(bmu_x, bmu_y); it != nf.end(bmu_x, bmu_y); ++it) {
@@ -474,7 +466,7 @@ public:
 						double h = it.contribution_weight();
 						// update weights of neuron idx
 						weight_vectors.col(idx) += learning_rate * h * (input - weight_vectors.col(idx));
-						
+
 					}
 
 				}
@@ -490,6 +482,15 @@ public:
 		(weight_vectors.colwise() - x).colwise().norm().minCoeff(&winner);
 		return winner;
 
+	}
+
+	void plot_10_kernel(Plotter plotter, int n) {
+		// This plots 10 weights. Useful in our application of MNIST to see if our kernel is "memorizing"
+		// the images correctly.
+		for (int i = 0; i < 10 * 10; i += 9) {
+			plotter.context().show_heatmap(get_weights(i).data(), 28, 28, "gray");
+		} 
+		plotter.block(); // NOTE: this is to move in the function that calls this, is here to remember 
 	}
 
 };

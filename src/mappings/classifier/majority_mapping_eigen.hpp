@@ -41,6 +41,7 @@ private:
 	}
 
 public:
+	using DoubleVector = Eigen::Matrix<double, Eigen::Dynamic, 1>; 
 
 	MajorityMappingEigen(KonohenMapEigen<DataType>& trained_map, double th, std::map<int, std::string> labels_map) :
 		trained_map(trained_map), threshold(th), labels_map(labels_map) {
@@ -69,7 +70,33 @@ public:
 	}
 
 	// Pass a labeled set of data in order to classify the neurons of the trained map
-	void classify(const DatasetEigen<DataType, int>& dataset) { 
+	void classify(const DatasetEigen<DataType, int>& dataset) {
+
+		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
+
+		// Here we compute the required histogram. 
+		for (size_t i = 0; i < dataset.size(); ++i) {
+			const auto& x = dataset.x_of(i);
+			int label_id = dataset.y_of(i);
+
+			int neuron_idx = trained_map.map(x);
+
+			hits_map[neuron_idx](label_id) += 1;
+		}
+
+		// assign labels to neurons
+		int width = trained_map.get_map_width();
+		int height = trained_map.get_map_height();
+
+		for (int j = 0; j < height; ++j)
+			for (int i = 0; i < width; ++i)
+				// This function implicitly uses our hits map (histogram of the imputations)
+				map_neuron_label(i, j) = most_frequent_hit(from_xy_to_idx(i, j));
+
+	}
+
+	// Pass a labeled set of data in order to classify the neurons of the trained map
+	void classify(const VectorDataset<DoubleVector, unsigned int>& dataset) {
 
 		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
 
@@ -113,7 +140,6 @@ public:
 	int most_frequent_hit(int idx) {
 		Eigen::VectorXd& labels = hits_map[idx];
 		Eigen::Index maxIdx;
-		//std::cout << "labels " << labels << "\n\n";
 
 		int total = labels.sum();
 		if (total == 0) return -1;

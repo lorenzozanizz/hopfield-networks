@@ -412,31 +412,25 @@ io_utils_compile() {
 
 }
 
-using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
+using DoubleVector = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 void classification_MNIST() {
-
-	
-	// #NOTE: TO HAVE A GOOD REPRESENTATION OF THE CLASSIFICATION MAP,
-	// LOTS OF DATAPOINT ARE REQUIRED (E.G. FOR A 10x10 mapping with 400
-	// we get a decent result, NOTE THAT THE ENTIRE MNIST DATASET THAT WE WILL
-	//USE AT THE END HAS 10.000 DATAPOINTS!
-	VectorDataset<IntVector, unsigned int> mnist(400);
+	// ----------------------
+	// Loading MNIST
+	// ----------------------
+	VectorDataset<DoubleVector, unsigned int> mnist(400);
 	DatasetRepo::load_mnist_eigen("vector_mnist.data", 400, mnist);
-	std::cout << "ECCOMI" << std::endl;
-	for (int i = 0; i < 400; ++i) {
-	 	std::cout << "index i: " << i << " label: " << mnist.y_of(i) << "\n" << std::endl;
-	}
-	// Parameters
-	unsigned int input_size = 28*28;       // each input vector has 3 features
-	unsigned int iterations = 100;
-	double learning_rate = 0.10;
-
-
-	// Parameters
+	
 	// #NOTE: personalmente a me confonde un po' tutta sta roba, ma visto che la mappa sembra
 	// funzionare teniamo così e via, documenta però bene i costruttori della evolving func
 	// e in caso alcune configurazioni (tipo lineare) non usano alcuni parametri crea multipli
 	// costruttori
+	// 
+	// ----------------------
+	// Setting the parameters
+	// ----------------------
+	unsigned int input_size = 28 * 28;
+	unsigned int iterations = 100;
+	double learning_rate = 0.10;
 	double sigma0 = 3.0;
 	double tau = 10.0;
 	unsigned int map_width = 10;
@@ -447,27 +441,18 @@ void classification_MNIST() {
 	// Create map and neighborhood
 	// ----------------------
 	KonohenMapEigen<double> km(map_width, map_height, input_size);
-
-	// Create NeighbouringFunction
 	NeighbouringFunctionEigen nf(sigma0, tau, map_width, map_height, evolving_func);
 
-	// Set support size
+	// ----------------------
+	// Initializing and training Konohen map
+	// ----------------------
 	nf.set_support_size(2);
-
 	km.initialize();
+	km.train(mnist, iterations, nf, learning_rate);
 
-	std::vector<Eigen::VectorXd> data_double;
-	data_double.reserve(100);
-
-
-	// #NOTE: Questa cosa non serve, basta che carichi i dati in un dataset in double vector, 
-	// invece che in int (la funzione che carica il dataset è templetizzata!)
-	for (const auto& v : mnist.get_n_elements_data(400)) {
-		data_double.push_back(v.cast<double>());
-	}
-
-	km.train(data_double, iterations, nf, learning_rate);
-	
+	// ----------------------
+	// Creating the label map for MNIST
+	// ----------------------
 	std::map<int, std::string> labels_map;
 	labels_map[0] = "unknown";
 	labels_map[1] = "zero";
@@ -481,7 +466,9 @@ void classification_MNIST() {
 	labels_map[9] = "eight";
 	labels_map[10] = "nine";
 	
-	
+	// ----------------------
+	// Initializing the majority map and performing the classification
+	// ----------------------
 	MajorityMappingEigen<double> classifier(km, 0.6, labels_map);
 
 	// Inoltre, non capisco perchè usi un altro datatype per questo dataset,  per giunta
@@ -489,14 +476,9 @@ void classification_MNIST() {
 
 	// Se vuoi sperimentare con la vettorizzazione "massiva" su più batch di input, 
 	// usa le BatchView del VectorDataset di prima, sono a costo 0 (solamente view)
-
-	DatasetEigen<double, int> dataset(input_size);
-	for (int i = 0; i < 400; ++i) {
-		dataset.add_sample(mnist.x_of(i).cast<double>(), mnist.y_of(i));
-	}
 	
 	try {
-		classifier.classify(dataset);
+		classifier.classify(mnist);
 	}
 	catch (const std::out_of_range& e) {
 		std::cerr << "Classification error: " << e.what() << std::endl;
@@ -507,80 +489,63 @@ void classification_MNIST() {
 		throw;
 	}
 
-
+	// ----------------------
+	// Plotting the results
+	// ----------------------
 	Plotter plotter;
 	classifier.plot(plotter);
 
-	// Scegli circa 10 kernel a caso da plottare, dovrebbero approssimare le immagini
-	// del mnist in una certa misura, se sono rumore a caso allora qualcosa sicuramente non va. 
-	for (int i = 0; i < 10 * 10; i += 9) {
-		plotter.context().show_heatmap(km.get_weights(i).data(), 28, 28, "gray");
-	}
-	// Se non è chiaro perchè vengono fuori delle foto di numeri quando plotti i pesi, dimmelo
-	// che è importante!!!!!!!!!! 
-
 	// #note: crea una funzione che visualizza i kernel in questo modo, la mettiamo negli
 	// examples. 
-	plotter.block();
 
 }
 
-using IntVector = Eigen::Matrix<unsigned int, Eigen::Dynamic, 1>;
+using DoubleVector = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 void clustering_MNIST() {
 
-
-	// #note: come prima, qui devi usare un bel po' di dati e.g. 400 / 500 al minimo
-
-	VectorDataset<IntVector, unsigned int> mnist(100); 
+	// ----------------------
+	// Loading MNIST
+	// ----------------------
+	VectorDataset<DoubleVector, unsigned int> mnist(100); 
 	DatasetRepo::load_mnist_eigen("vector_mnist.data", 100, mnist);
 
-	for (int i = 0; i < 50; ++i) {
-		std::cout << "index i: " << i << " label: " << mnist.y_of(i) << "\n" << std::endl;
-	}
-
-	// Parameters
+	// ----------------------
+	// Setting the parameters
+	// ----------------------
 	unsigned int input_size = 28 * 28;
 	unsigned int iterations = 500;
 	double learning_rate = 0.2;
-
-
-	// Parameters
 	double sigma0 = 3.0;
 	double tau = 13;
 	unsigned int map_width = 15;
 	unsigned int map_height = 15;
 	std::string evolving_func = "exponential";
 
+	// ----------------------
+	// Create map and neighborhood
+	// ----------------------
 	KonohenMapEigen<double> km(map_width, map_height, input_size);
-
-	// Create NeighbouringFunction
 	NeighbouringFunctionEigen nf(sigma0, tau, map_width, map_height, evolving_func);
 
-	// Set support size
+	// ----------------------
+	// Initializing and training Konohen map
+	// ----------------------
 	nf.set_support_size(2);
-
 	km.initialize();
+	km.train(mnist, iterations, nf, learning_rate);
 
-	std::vector<Eigen::VectorXd> data_double;
-	data_double.reserve(mnist.get_data().size());
-
-	for (const auto& v : mnist.get_data()) {
-		data_double.push_back(v.cast<double>());
-	}
-
-	km.train(data_double, iterations, nf, learning_rate);
-
+	// ----------------------
+	// Initializing the UMatrix and performing the clustering
+	// ----------------------
 	UClusteringEigen<double> UMap(km, 0.4);
 	UMap.compute();
+
+	// ----------------------
+	// Plotting the results
+	// ----------------------
 	Plotter plotter;
 	UMap.plot(plotter);
 
-	for (int i = 0; i < 10 * 10; i += 9) {
-		plotter.context().show_heatmap(km.get_weights(i).data(), 28, 28, "gray");
-	}
-	// Se non è chiaro perchè vengono fuori delle foto di numeri quando plotti i pesi, dimmelo
-	// che è importante!!!!!!!!!! 
-	plotter.block();
 }
 
 // Just create the folder...
@@ -592,7 +557,7 @@ int main() {
 	//clustering_test_eigen();
 	Eigen::initParallel();
 	Eigen::setNbThreads(std::thread::hardware_concurrency());
-	// clustering_MNIST(); 
+	//clustering_MNIST(); 
 	classification_MNIST();
 
 	// classification_test();
