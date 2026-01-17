@@ -26,42 +26,26 @@ private:
 	double threshold;
 	Eigen::MatrixXd u;
 
+	// computing the distance between the weights in the neuron at idx_1 and the neuron at idx_2
 	double computing_distance(int idx_1, int idx_2) {
 		return (trained_map.get_weights(idx_1) - trained_map.get_weights(idx_2)).norm();
-
 	}
 
-	bool inside_map(int x, int y) const {
-		return x >= 0 && y >= 0 && x < width && y < heigth;
-	}
-
-	// U-matrix value between (x1,y1) and (x2,y2)
-	double u_between(int x1, int y1, int x2, int y2) const {
-		int ux = x1 + x2;
-		int uy = y1 + y2;
-		return u(ux, uy);
-	}
-
+	// Normalize all the elements in the U-matrix
 	void normalize() {
 		double max = u.maxCoeff();
-
 		if (max == 0.0) return;
-	
 		u.array() /= max;
 		
 	}
 
 public:
-	UClusteringEigen(KonohenMapEigen<DataType>& trained_map, double threshold) : trained_map(trained_map), threshold(threshold) {
+	UClusteringEigen(KonohenMapEigen<DataType>& trained_map) : trained_map(trained_map) {
 		heigth = trained_map.get_map_height();
 		width = trained_map.get_map_width();
 		u_heigth = (2 * heigth - 1);
 		u_width = (2 * width - 1);
 		u = Eigen::MatrixXd::Zero(u_heigth, u_width); 
-	}
-
-	void set_threshold(double new_th) {
-		threshold = new_th;
 	}
 
 	int uidx(int x, int y) const {
@@ -72,6 +56,7 @@ public:
 		return y * width + x;
 	};
 
+	// return the mean between the 4 "cross" neighbours
 	double neighb_mean(int x, int y) {
 
 		int xmin = std::max(0, x - 1);
@@ -97,19 +82,16 @@ public:
 
 				if (x != width - 1) {
 					float d_h = computing_distance(i, j);
-					//std::cout << "distance between " << "(" << x << ", " << y << ") and " << "(" << x+1 << ", " << y  << ") is " << d_h << "\n";
 					u(2 * x + 1, 2 * y) = d_h; // horizontal distance
 
 				}
 				if (y != heigth - 1) {
 					float d_v = computing_distance(i, k);
-					//std::cout << "distance between " << "(" << x << ", " << y << ") and " << "(" << x << ", " << y+1 << ") is " << d_v << "\n";
 					u(2 * x, 2 * y + 1) = d_v; // vertical distance
 				}
 
 				if ((x != width - 1) && (y != heigth - 1)) {
 					float d_d = computing_distance(i, z);
-					//std::cout << "distance between " << "(" << x << ", " << y << ") and " << "(" << x+1 << ", " << y + 1 << ") is " << d_d << "\n";
 					u(2 * x + 1, 2 * y + 1) = d_d; // diagonal distance
 				}
 

@@ -54,6 +54,17 @@ public:
 		this->sigma = sigma_0;
 	}
 
+	NeighbouringFunctionEigen(double sigma_0, double tau, unsigned int map_width, unsigned int map_height)
+		:sigma_0(sigma_0), tau(tau), map_width(map_width), map_height(map_height) {
+		this->sigma = sigma_0;
+	}
+
+	NeighbouringFunctionEigen(double sigma_0, unsigned int map_width, unsigned int map_height)
+		:sigma_0(sigma_0), map_width(map_width), map_height(map_height) {
+		this->set_sigma_evolving_function("linear");
+		this->sigma = sigma_0;
+	}
+
 	double get_sigma() const {
 		return sigma;
 	}
@@ -128,8 +139,8 @@ public:
 
 
 	void evolve_sigma(unsigned int iteration_step) {
-		// This evolves sigma according to some schedule the user has to provide for example
-		// with a function. generally sigma decreases as the iteration continues.
+		// This evolves sigma according to some schedule the user has to provide.
+		// Generally sigma decreases as the iteration continues.
 		switch (this->sigma_evolving_function) {
 
 		case exponential: this->sigma = sigma_0 * std::exp(-static_cast<double>(iteration_step) / tau);
@@ -476,6 +487,23 @@ public:
 			nf.evolve_sigma(t);
 		}
 	}
+
+	Eigen::VectorXi map(const Eigen::MatrixXd& batch) const {
+		const int B = batch.cols();
+		const int N = weight_vectors.cols();
+
+		Eigen::RowVectorXd w_norms = weight_vectors.colwise().squaredNorm();
+		Eigen::RowVectorXd x_norms = batch.colwise().squaredNorm();
+
+		Eigen::MatrixXd dist =	w_norms.transpose().replicate(1, B)
+		+ x_norms.replicate(N, 1) - 2.0 * weight_vectors.transpose() * batch;
+
+		Eigen::VectorXi bmus(B) ;
+		for (int b = 0; b < B; ++b)
+			dist.col(b).minCoeff(&bmus(b));
+		return bmus;
+	}
+
 
 	unsigned int map(const Eigen::VectorXd& x) const {
 		unsigned int winner = 0;

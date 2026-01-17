@@ -21,12 +21,14 @@ template <typename DataType = float>
 class MajorityMappingEigen {
 
 private:
+	using DoubleMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
+	using IntMatrix = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>;
 
 	KonohenMapEigen<DataType>& trained_map;
 	double threshold; // the percentage of hits required to label a neuron
 	std::map<int, std::string>  labels_map; // this maps a label idx to its label
 	std::map<int, Eigen::VectorXd> hits_map; // this maps a neuron idx to a vector that keeps track of how many times each label hits that neuron
-	Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> map_neuron_label; // this maps a neuron idx to its label idx 
+	IntMatrix map_neuron_label; // this maps a neuron idx to its label idx 
 
 	const int x_from_idx(int idx) {
 		return idx % trained_map.get_map_width();
@@ -42,7 +44,6 @@ private:
 
 public:
 	using DoubleVector = Eigen::Matrix<double, Eigen::Dynamic, 1>; 
-
 	MajorityMappingEigen(KonohenMapEigen<DataType>& trained_map, double th, std::map<int, std::string> labels_map) :
 		trained_map(trained_map), threshold(th), labels_map(labels_map) {
 		initialize();
@@ -69,58 +70,64 @@ public:
 		threshold = new_th;
 	}
 
-	// Pass a labeled set of data in order to classify the neurons of the trained map
-	void classify(const DatasetEigen<DataType, int>& dataset) {
+	// Computing the "matches" between the input data and the nodes trained in our Konohen map
+	void compute_hits(const VectorDataset<DoubleVector, unsigned int>& dataset,
+		int batch_size) {
 
-		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
+		int input_size = trained_map.get_input_size();
 
-		// Here we compute the required histogram. 
-		for (size_t i = 0; i < dataset.size(); ++i) {
-			const auto& x = dataset.x_of(i);
-			int label_id = dataset.y_of(i);
+		for (const auto& batch : dataset.batches(batch_size)) {
 
-			int neuron_idx = trained_map.map(x);
+			Eigen::MatrixXd X(input_size, batch_size); // rows X cols
 
-			hits_map[neuron_idx](label_id) += 1;
+			for (int i = 0; i < batch_size; ++i)
+				X.col(i) = batch.x_of(i);
+
+			Eigen::VectorXi bmus = trained_map.map(X);
+
+			for (int i = 0; i < batch_size; ++i) {
+				int neuron = bmus(i);
+				int label = batch.y_of(i);
+				hits_map[neuron](label) += 1;
+			}
 		}
-
-		// assign labels to neurons
-		int width = trained_map.get_map_width();
-		int height = trained_map.get_map_height();
-
-		for (int j = 0; j < height; ++j)
-			for (int i = 0; i < width; ++i)
-				// This function implicitly uses our hits map (histogram of the imputations)
-				map_neuron_label(i, j) = most_frequent_hit(from_xy_to_idx(i, j));
 
 	}
 
 	// Pass a labeled set of data in order to classify the neurons of the trained map
-	void classify(const VectorDataset<DoubleVector, unsigned int>& dataset) {
+	void classify(const VectorDataset<DoubleVector, unsigned int>& dataset,
+		int batch_size) {
 
-		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
+		compute_hits(dataset, batch_size);
 
-		// Here we compute the required histogram. 
-		for (size_t i = 0; i < dataset.size(); ++i) {
-			const auto& x = dataset.x_of(i);
-			int label_id = dataset.y_of(i);
-
-			int neuron_idx = trained_map.map(x);
-
-			hits_map[neuron_idx](label_id) += 1;
-		}
-
-		// assign labels to neurons
+		// assigning labels to neurons based on which label hit more time every neuron
 		int width = trained_map.get_map_width();
-		int height = trained_map.get_map_height();
-
+		int height = trained_map.get_map_height();  
 		for (int j = 0; j < height; ++j) 
-			for (int i = 0; i < width; ++i) 
-				// This function implicitly uses our hits map (histogram of the imputations)
+			for (int i = 0; i < width; ++i)
+				// This function implicitly uses our hits map (histogram of the imputations) 
 				map_neuron_label(i, j) = most_frequent_hit(from_xy_to_idx(i, j));
 
 	}
+	/*Eigen::VectorXi map_batch(const Eigen::MatrixXd& batch) const {
+    const int B = batch.cols();
+    const int N = weight_vectors.cols();
 
+    Eigen::RowVectorXd w_norms = weight_vectors.colwise().squaredNorm();
+    Eigen::RowVectorXd x_norms = batch.colwise().squaredNorm();
+
+    Eigen::MatrixXd dist =
+        w_norms.transpose().replicate(1, B)
+      + x_norms.replicate(N, 1)
+      - 2.0 * weight_vectors.transpose() * batch;
+
+    Eigen::VectorXi bmus(B);
+    for (int b = 0; b < B; ++b)
+        dist.col(b).minCoeff(&bmus(b));
+
+    return bmus;
+}
+*/
 	// Warning! You can call this fuction only after calling classify()!
 	std::string label_for(int idx) {
 		int label_idx = map_neuron_label(x_from_idx(idx), y_from_idx(idx));
