@@ -43,8 +43,13 @@ public:
 	virtual void synch_update(BinaryState& bs, LocalFields<DataType>& fields) = 0;
 
 	// Compute the local fields of a limited subgroups of the units
-	virtual void compute_local_fields(BinaryState& bs, std::vector<state_index_t> units,
+	virtual void compute_local_fields(const BinaryState& bs, std::vector<state_index_t> units,
 		std::vector<DataType>& out) = 0;
+
+	// Compute the local fields of a single unit
+	virtual DataType compute_local_field(const BinaryState& bs, state_index_t unit, bool overwrite) = 0;
+
+	virtual void hint_state(const BinaryState& bs) = 0;
 
 };
 
@@ -106,15 +111,15 @@ public:
 
 	// Compute the local fields across the entirety of the network. This
 	// leaves freedom of implementation for the activation function of the network. 
-	virtual void synch_update(BinaryState& bs, LocalFields<DataType>& fields) {
+	virtual void synch_update(BinaryState& bs, LocalFields<DataType>& fields) override {
 		for (int i = 0; i < this->net_size; ++i)
 			intermediate(i) = (bs.get(i)) ? 1 : -1;
 		fields = weights * intermediate;
 	}
 
 	// Compute the local fields of a limited subgroups of the units
-	virtual void compute_local_fields(BinaryState& bs, std::vector<state_index_t> units,
-		std::vector<DataType>& out) {
+	virtual void compute_local_fields(const BinaryState& bs, std::vector<state_index_t> units,
+		std::vector<DataType>& out) override {
 		for (int i = 0; i < this->net_size; ++i)
 			intermediate(i) = (bs.get(i)) ? 1 : -1;
 		for (int unit_i = 0; unit_i < units.size(); ++unit_i) {
@@ -122,6 +127,19 @@ public:
 			const auto& r = weights.col(units[unit_i]);
 			out.push_back(r.dot(intermediate));
 		}
+		return;
+	}
+
+	virtual DataType compute_local_field(const BinaryState& bs, state_index_t unit, bool overwrite) override {
+		if (overwrite)
+			for (int i = 0; i < this->net_size; ++i)
+				intermediate(i) = (bs.get(i)) ? 1 : -1;
+		return weights.col(unit).dot(intermediate);
+	}
+
+	virtual void hint_state(const BinaryState& bs) override {
+		for (int i = 0; i < this->net_size; ++i)
+			intermediate(i) = (bs.get(i)) ? 1 : -1;
 		return;
 	}
 
@@ -271,7 +289,7 @@ public:
 			"policy. If you require batch computation, use batch weighting policies instead!");
 	}
 
-	virtual DataType compute_weight(state_index_t i, state_index_t j) {
+	virtual DataType compute_weight(state_index_t i, state_index_t j) override {
 		DataType online_weight = DataType(0);
 		if (i == j)
 			return 0.0;
@@ -286,8 +304,8 @@ public:
 	}
 
 	// Compute the local fields of a limited subgroups of the units
-	virtual void compute_local_fields(BinaryState& bs, std::vector<state_index_t> units,
-		std::vector<DataType>& out) {
+	virtual void compute_local_fields(const BinaryState& bs, std::vector<state_index_t> units,
+		std::vector<DataType>& out) override {
 
 		for (int i = 0; i < this->net_size; ++i)
 			intermediate(i) = (bs.get(i)) ? DataType(1) : DataType(-1);
@@ -302,6 +320,24 @@ public:
 			}
 			out.push_back(local_field);
 		}
+	}
+
+	virtual void hint_state(const BinaryState& bs) override {
+		for (int i = 0; i < this->net_size; ++i)
+			intermediate(i) = (bs.get(i)) ? 1 : -1;
+		return;
+	}
+
+	virtual DataType compute_local_field(BinaryState& bs, state_index_t unit, bool overwrite) override {
+		if (overwrite)
+			for (int i = 0; i < this->net_size; ++i)
+				intermediate(i) = (bs.get(i)) ? 1 : -1;
+		DataType local_field = DataType(0);
+		for (unsigned int j = 0; j < net_size; ++j) {
+			DataType online_weight = compute_weight(unit, j);
+			local_field += intermediate[j] * online_weight;
+		}
+		return local_field;
 	}
 };
 

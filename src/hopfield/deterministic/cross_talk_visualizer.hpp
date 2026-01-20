@@ -10,9 +10,13 @@
 #include "../../io/image/images.hpp"
 #include "../states/binary.hpp"
 
+
+template <typename FloatingType>
 class HebbianCrossTalkTermVisualizer {
 
-	std::vector<float> cross_talks;
+	using CrossTalk = Eigen::Matrix<FloatingType, Eigen::Dynamic, 1>;
+
+	CrossTalk cross_talks;
 
 	// Store a copy of the gnu plotter and the network 
 	Plotter& plotter;
@@ -31,7 +35,9 @@ public:
 	void compute_cross_talk_view(BinaryState& reference, std::vector<BinaryState*> init) {
 		float sum_i;
 		
-		memset(cross_talks.data(), 0, cross_talks.size() * sizeof(float));
+		cross_talks.resize(reference.get_size());
+		cross_talks.setZero();
+
 		const auto size = reference.get_size();
 		for (int i = 0; i < size; ++i) {
 			// For each entry of the state we compute its cross talk with all other

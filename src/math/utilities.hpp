@@ -32,6 +32,23 @@ namespace Utilities {
 		return std::sqrt(result);
 	}
 
+	void eigen_set_num_threads(int num_threads = -1) {
+		if (num_threads ==  -1)
+			Eigen::setNbThreads(std::thread::hardware_concurrency());
+		else 
+			Eigen::setNbThreads(num_threads);
+	}
+
+	void eigen_init_parallel(int num_threads = 0) {
+		Eigen::initParallel();
+		if (num_threads)
+			eigen_set_num_threads(num_threads);
+	}
+
+	int eigen_get_num_threads() {
+		return Eigen::nbThreads();
+	}
+
 }
 
 #endif

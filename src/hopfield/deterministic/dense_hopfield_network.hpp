@@ -56,7 +56,7 @@ public:
 			local_fields_out.clear();
 
 			if (uc.up == UpdatePolicy::Synchronous) {
-				// Entrust the weightpolicy to compute the dot values for the states. 
+				// Entrust the weight policy to compute the dot values for the states. 
 				this->policy.synch_update(this->binary_state, this->local_fields);
 				for (int i = 0; i < this->network_size; ++i)
 					this->binary_state.set_value(i, MathOps::sgn(this->local_fields[i]) > 0);

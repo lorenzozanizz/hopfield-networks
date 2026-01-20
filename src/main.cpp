@@ -8,6 +8,9 @@
 #include "hopfield/deterministic/dense_hopfield_network.hpp"
 #include "hopfield/stochastic/stochastic_hopfield_network.hpp"
 #include "hopfield/deterministic/cross_talk_visualizer.hpp"
+
+#include "hopfield/parallelized/parallelized_deterministic.hpp"
+#include "hopfield/parallelized/parallelized_stochastic.hpp"
 #include "hopfield/logger/logger.hpp"
 
 // Reservoir computing
@@ -168,7 +171,7 @@ hopfield_compile() {
 	if (cls)
 		std::cout << "Classificazione: " << std::get<1>(*(dhn.classify()));
 
-	HebbianCrossTalkTermVisualizer cttv(p, 40*40);
+	HebbianCrossTalkTermVisualizer<float> cttv(p, 40*40);
 	std::cout << "Devo calcola" << std::endl;
 
 	cttv.compute_cross_talk_view(bs1, { &bs2, &bs3 });
@@ -315,7 +318,7 @@ reservoir_compile() {
 	*/
 
 	VectorDataset<Eigen::VectorXf, Eigen::VectorXf> ecg_series(100);
-	DatasetRepo::load_mit_bih( "nowhere", 100, ecg_series);
+	DatasetRepo::load_mit_bih("mitbih_combined_records.csv", 100, ecg_series);
 
 	VectorDataset<Eigen::VectorXf, Eigen::VectorXf> sine_series(100);
 	DatasetRepo::load_sine_time_series<float>(/* amount */300, sine_series);
@@ -646,9 +649,10 @@ int main() {
 	//clustering_MNIST();
 	//classification_MNIST();
 	//clustering_test_eigen();
-	Eigen::initParallel();
-	Eigen::setNbThreads(std::thread::hardware_concurrency());
-	clustering_MNIST(); 
+
+	Utilities::eigen_init_parallel( -1 );
+
+	// clustering_MNIST(); 
 	//classification_MNIST();
 
 	// classification_test();
