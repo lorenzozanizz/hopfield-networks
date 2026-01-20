@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cstring>
+#include <memory>
 #include <string>
 
 // This module is a small lightweight wrapper to the stbi header-only library for 

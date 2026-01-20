@@ -6,6 +6,8 @@
 // Import sparse matrix required for the intra-reservoir dynamics.
 #include "../math/matrix/matrix_ops.hpp"
 
+#include "../io/datasets/dataset.hpp"
+
 enum class SamplingType {
 	Uniform, 
 	Normal
