@@ -69,7 +69,7 @@ private:
 
     void init_random(const KonohenMapEigen<double>& X) {
 
-        //Plotter plotter;
+        Plotter plotter;
 
         int N = X.get_map_width() * X.get_map_height();
         W = X.get_map_width();
@@ -83,16 +83,16 @@ private:
         for (int k = 0; k < K; ++k) {
             unsigned int idx = dist(gen);    // sample a neuron index
             centroids_.col(k) = X.get_weights(idx);
-            //plotter.context().show_heatmap(X.get_weights(idx).data(), 28, 28, "gray");
-            //std::cout << "this is label : " << k << "\n";
-            //plotter.block();
+            plotter.context().show_heatmap(X.get_weights(idx).data(), 28, 28, "gray");
+            std::cout << "this is label : " << k << "\n";
+            plotter.block();
         }
 
     }
 
     void assign_labels(const KonohenMapEigen<double>& X) { 
 
-       //Plotter plotter;
+       Plotter plotter;
 
         int N = X.get_map_width() * X.get_map_height();
         int D = X.get_input_size();
@@ -109,9 +109,9 @@ private:
         // Assign labels
         for (int i = 0; i < N; ++i) {
             distances.col(i).minCoeff(&labels_(i));
-            //plotter.context().show_heatmap(X.get_weights(i).data(), 28, 28, "gray");
-            //std::cout << "label : " << labels_(i) << "\n";
-            //plotter.block();
+            plotter.context().show_heatmap(X.get_weights(i).data(), 28, 28, "gray");
+            std::cout << "label : " << labels_(i) << "\n";
+            plotter.block();
         }
     }
 
