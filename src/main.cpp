@@ -22,10 +22,12 @@
 #include "mappings/classifier/majority_mapping.hpp"
 #include "mappings/clustering/u_clustering.hpp"
 */
+#include "mappings/clustering/k_means.hpp"
 
 #include "mappings/konohen_mapping_eigen.hpp"
 #include "mappings/classifier/majority_mapping_eigen.hpp"
 #include "mappings/clustering/u_clustering_eigen.hpp"
+#include "mappings/clustering/cluster.hpp"
 
 // Restricted Boltzmann machines
 #include "boltzmann/restricted_boltzmann_machine.hpp"
@@ -431,8 +433,8 @@ void classification_MNIST() {
 	// 
 	// Map parameters
 	unsigned int input_size = 28 * 28; 
-	unsigned int map_width = 10; 
-	unsigned int map_height = 10;
+	unsigned int map_width = 6; 
+	unsigned int map_height = 6;
 	unsigned int iterations = 100; // number of iterations to perform in the training of the Kohonen map
 	double learning_rate = 0.10; // weight of the update in each iteration in the Kohonen map
 
@@ -499,12 +501,19 @@ void classification_MNIST() {
 	// ----------------------
 	// Plotting the results
 	// ----------------------
+
 	Plotter plotter;
+
+	KMeans kmeans(10);
+	kmeans.fit(km);
+	kmeans.plot(plotter);
+
+	
 	classifier.plot(plotter);
-	for (int i = 0; i < 10 * 10; i += 9) {
-		plotter.context().show_heatmap(km.get_weights(i).data(), 28, 28, "gray");
-	}
-	plotter.block(); // NOTE: this is to move in the function that calls this, is here to remember 
+	//for (int i = 0; i < 6 * 6; i += 9) {
+		//plotter.context().show_heatmap(km.get_weights(i).data(), 28, 28, "gray");
+	//}
+	//plotter.block(); // NOTE: this is to move in the function that calls this, is here to remember 
 	// #note: crea una funzione che visualizza i kernel in questo modo, la mettiamo negli
 	// examples. 
 
@@ -516,15 +525,15 @@ void clustering_MNIST() {
 	// ----------------------
 	// Loading MNIST
 	// ----------------------
-	VectorDataset<DoubleVector, unsigned int> mnist(80); 
-	DatasetRepo::load_mnist_eigen("vector_mnist.data", 80, mnist);
+	VectorDataset<DoubleVector, unsigned int> mnist(300); 
+	DatasetRepo::load_mnist_eigen("vector_mnist.data", 300, mnist);
 
 	// Map parameters
 	unsigned int input_size = 28 * 28;
-	unsigned int map_width = 6;
-	unsigned int map_height = 6;
-	unsigned int iterations = 200; // number of iterations to perform in the training of the Kohonen map
-	double learning_rate = 0.30; // weight of the update in each iteration in the Kohonen map
+	unsigned int map_width = 7;
+	unsigned int map_height = 7;
+	unsigned int iterations = 100; // number of iterations to perform in the training of the Kohonen map
+	double learning_rate = 0.10; // weight of the update in each iteration in the Kohonen map
 
 	// Evolving function parameters (how the sigma changes through the iterations)
 	std::string evolving_func = "exponential"; // Other options: linear, piecewise and inverse_time 
@@ -549,14 +558,24 @@ void clustering_MNIST() {
 	// ----------------------
 	// Initializing the UMatrix and performing the clustering
 	// ----------------------
-	UClusteringEigen<double> UMap(km);
-	UMap.compute();
+	Cluster<double> UMap(km);
+	//UMap.compute();
 
 	// ----------------------
-	// Plotting the results
+	// Plotting the results 
 	// ----------------------
 	Plotter plotter;
-	UMap.plot(plotter);
+	//UMap.plot(plotter);
+
+
+	KMeans kmeans(10);
+	kmeans.fit(km);
+	kmeans.plot(plotter);
+
+	//for (int i = 0; i < 6 * 6; i += 2) {
+		//plotter.context().show_heatmap(km.get_weights(i).data(), 28, 28, "gray");
+	//}
+	//plotter.block();
 
 }
 
@@ -627,7 +646,7 @@ void clustering() {
 	// ----------------------
 	// Initializing the UMatrix and performing the clustering
 	// ----------------------
-	UClusteringEigen<double> UMap(km);
+	Cluster<double> UMap(km);
 	UMap.compute();
 
 	// ----------------------
@@ -647,8 +666,8 @@ int main() {
 	//clustering_test_eigen();
 	Eigen::initParallel();
 	Eigen::setNbThreads(std::thread::hardware_concurrency());
-	clustering_MNIST(); 
-	//classification_MNIST();
+	//clustering_MNIST();  
+	classification_MNIST();
 
 	// classification_test();
 
