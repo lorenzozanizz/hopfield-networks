@@ -29,6 +29,7 @@
 
 // Restricted Boltzmann machines
 #include "boltzmann/restricted_boltzmann_machine.hpp"
+#include "boltzmann/deep_belief_network.hpp"
 #include "boltzmann/boltzmann_logger.hpp"
 
 // Io routines
@@ -319,7 +320,7 @@ reservoir_compile() {
 	VectorDataset<Eigen::VectorXf, Eigen::VectorXf> sine_series(100);
 	DatasetRepo::load_sine_time_series<float>(/* amount */300, sine_series);
 	
-	NetworkTrainer<float> trainer ( mlp ) ;
+	NetworkTrainer<float, MultiLayerPerceptron<float>> trainer ( mlp ) ;
 	trainer.set_loss_function(& loss_function, y, y_hat);
 
 	trainer.train(

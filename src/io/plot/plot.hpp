@@ -14,10 +14,14 @@
 // This section requires explicit support for gnuplot and cannot be compiled
 // without it. (CMAKE will assert this define if gnuplot is found)
 #ifndef COMPILE_WITH_GNUPLOT
+#ifndef WARNED_GNUPLOT_YET
+#define WARNED_GNUPLOT_YET
 #error "You are attempting to include a gnuplot wrapper which requires\n\
 	gnuplot. No installation was found"
 static_assert(false, "You are attempting to include a gnuplot wrapper which " 
 	"requires gnuplot. No installation was found")
+
+#endif // !WARNED_GNUPLOT_YET
 #else
 // Header only library for gnuplot interface
 #include "gnuplot_wrapper.hpp"
@@ -163,6 +167,41 @@ public:
 			return *this;
 		}
 
+		template <typename FloatingType>
+		PlottingContext& plot_multiple_heatmaps(
+			std::vector<FloatingType*> buffers, unsigned int plot_width, unsigned int plot_height,
+			unsigned int width, unsigned int height
+		) {
+			pipe.send_line("set multiplot layout " + 
+				std::to_string(width) + "," + std::to_string(height));
+			pipe.send_line("unset key");
+			pipe.send_line("unset colorbox");
+			pipe.send_line("set size square");
+			pipe.send_line("set pm3d map");
+
+			// Set the grayscale palettes. 
+			pipe.send_line("set palette rgbformula -7,2,-7");
+
+			auto raw_pipe = pipe.raw();
+			for (int plot_i = 0; plot_i < plot_height; ++plot_i)
+				for (int plot_j = 0; plot_j < plot_width; ++plot_j) {
+					
+					auto& buffer = buffers[plot_i * plot_width + plot_j];
+
+					pipe.send_line("splot '-' matrix with image");
+					for (int i = 0; i < height; ++i) {
+						for (int j = 0; j < width; ++j)
+							if constexpr (std::is_same_v<FloatingType, double>) 
+								fprintf(raw_pipe, "%lf ", buffer[i * width + j]);
+							else if constexpr (std::is_same_v<FloatingType, float>) 
+								fprintf(raw_pipe, "%f ", buffer[i * width + j]);
+						fprintf(raw_pipe, "\n");
+					}
+					pipe.send_line("e");
+				}
+			return *this;
+		}
+
 		PlottingContext& show_heatmap(const float* buffer, int width, int height, 
 			std::string palette = "") {
 
@@ -200,7 +239,7 @@ public:
 
 			auto raw_pipe = pipe.raw();
 			pipe.send_line("splot '-' matrix with image");
-			for (int i = 0; i < width; ++i) {
+			for (int i = 0; i < height; ++i) {
 				for (int j = 0; j < width; ++j)
 					fprintf(raw_pipe, "%lf ", buffer[i * width + j]);
 				fprintf(raw_pipe, "\n");

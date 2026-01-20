@@ -29,10 +29,7 @@ public:
 	// When the model refuses to classify, this rejection category is passed instead. 
 	static constexpr const int Rejected = -1;
 
-	void put_mapping(const BinaryState& bs, const Category cat) {
-		classification_mapping.emplace_back( bs, cat );
-		categories.insert(cat);
-	}
+	void put_mapping(const BinaryState& bs, const Category cat);
 
 	void set_confidence_threshold(double confidence) {
 		threshold = confidence;
@@ -44,21 +41,7 @@ public:
 		return categories.count(cat) > 0;
 	}
 
-	std::tuple<BinaryState, Category>* classify( const BinaryState& bs ) {
-		// Iterate through our entire mapping computing the agreement for each known pattern,
-		// return the pattern with the highest agreement 
-		double max_seen_agreement = 0.0;
-		std::tuple<BinaryState, Category>* max_pair = nullptr;
-		
-		for (auto& pair : classification_mapping) {
-			double agreement = bs.agreement_score(std::get<0>(pair));
-			if (agreement > max_seen_agreement) {
-				max_seen_agreement = agreement;
-				max_pair = &pair;
-			}
-		}
-		return max_pair;
-	}
+	std::tuple<BinaryState, Category>* classify(const BinaryState& bs);
 
 	std::set<Category>& get_categories() {
 		return categories; 

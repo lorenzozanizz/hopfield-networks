@@ -16,14 +16,20 @@
 #include "restricted_boltzmann_machine.hpp"
 #include "boltzmann_logger.hpp"
 
+/**
+ * @brief A simple calculator class.
+ */
 template <typename FloatingType>
 class StackedRBM {
 	
 protected:
 
+	using Vector = Eigen::Matrix<FloatingType, Eigen::Dynamic, 1>;
+	using Matrix = Eigen::Matrix<FloatingType, Eigen::Dynamic, Eigen::Dynamic>;
+
 	// Keep a reference to all machines, avoid owning the machines directly. 
 	std::vector<std::reference_wrapper<
-		RestrictedBoltzmannMachine>> machines_stack;
+		RestrictedBoltzmannMachine<FloatingType>>> machines_stack;
 
 public:
 
@@ -31,6 +37,7 @@ public:
 		Plotter& plotter, 
 		unsigned int width, 
 		unsigned int height,
+		std::vector<unsigned int> how_many_per_layer, 
 		unsigned int from = 0,
 		unsigned int to = 0
 	) {
@@ -45,36 +52,54 @@ public:
 
 		using WeightKernels = Eigen::Matrix<FloatingType, Eigen::Dynamic, Eigen::Dynamic>;
 		// Associate to each layer its list of image-fitted kernels. 
-		map<unsigned int, WeightKernels> layer_mappings;
+		std::map<unsigned int, WeightKernels> layer_mappings;
 
 		if (!from && !to)
 			layer_mappings.reserve(machines_stack.size());
 		else layer_mappings.reserve(to - from + 1);
 
-		for (unsigned int layer = to; layer <= to; ++layer) {
+		// We need to construct all previous kernels, not just from "from" to "to"
+		for (unsigned int layer = 1; layer <= to; ++layer) {
 
+			machines_stack[layer].get().compute_higher_order_kernels(
+
+			);
 			// Compute the new mapping using the mapping of the previous layer. 
 			// See the note above this function to see why we do it like this. 
 		}
 
+		// Now plot just the required kernels. 
+		for (unsigned int layer = from; layer <= to; ++layer) {
+			
+			// Just views over the data, remember eigen has column_wise storage by default!
+			std::vector<FloatingType*> kernel_mappings;
+
+
+			// Get the amount of kernels to plot... 
+			const auto amount = how_many_per_layer[layer-from];
+			plotter.context().set_title("Kernels of machine of order " + std::to_string(layer))
+				.plot_multiple_heatmaps(kernel_mappings, width, height);
+		}
+
 	}
 
-	void unsupervised_train() {
+	void unsupervised_train(
+		int epochs,
+		VectorCollection<Vector>& data,
+		unsigned int batch_size,
+		double lr,
+		int k /* K parameter of the contrastive divergence algorithm. */,
+		double decay = 1e-4
+	) {
 		// Use the references for all the boltzmann machines to pre-train the network. 
 
 
+		// After each network is trained, the dataset is translated into its higher representation. 
+		// This unfortunately requires duplicating data, to avoid damagign the input data. 
+
 
 	}
 
-	void fine_tune() {
-
-		
-		// We use the interface for the backpropagation network trainer provided in the
-		// .hpp file: as long as we implement the requested methods, everything is fine. 
-		// NOTE: We mark such methods protected and declare the trainer class a friend. 
-
-	}
-	
 };
 
 #endif

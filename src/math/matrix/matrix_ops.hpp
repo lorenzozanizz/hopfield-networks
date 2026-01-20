@@ -23,6 +23,9 @@ namespace MathOps {
 	
 	using namespace Eigen;
 
+    /**
+     * @brief A simple calculator class.
+     */
     template <typename DenseMatrixType>
     double power_method(
         const DenseMatrixType& A,
@@ -62,6 +65,9 @@ namespace MathOps {
         return lambda_old;
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     template <typename DataType>
     double sparse_power_method(
         const SparseMatrix<DataType>& A,
@@ -104,16 +110,25 @@ namespace MathOps {
         return lambda_old;
     }
 
+    /**
+     * @brief A simple calculator class.
+    */
     template <typename VectorType>
     float lp_norm(const VectorType& v, float p) { 
         return std::pow(v.array().abs().pow(p).sum(), 1.0f / p);
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     template <typename T>
     int sgn(T val) {
         return (T(0) < val) - (val < T(0));
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     template <typename MatrixType>
     void save_matrix_binary(const std::string& filename, const MatrixType& M) {
         std::ofstream out(filename, std::ios::binary);
@@ -128,6 +143,9 @@ namespace MathOps {
             sizeof(typename MatrixType::Scalar) * rows * cols);
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     template <typename MatrixType>
     void load_matrix_binary(const std::string& filename, MatrixType& M) {
         std::ifstream in(filename, std::ios::binary);

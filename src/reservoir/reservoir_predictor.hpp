@@ -17,6 +17,10 @@
 #include "../math/autograd/functions.hpp"
 #include "../math/matrix/matrix_ops.hpp"
 
+
+/**
+ * @brief A simple calculator class.
+ */
 template <typename DataType>
 class ActivationFunction {
     
@@ -26,8 +30,12 @@ public:
 
     std::function<Matrix(const Matrix&)> f;
     std::function<Matrix(const Matrix&)> df;
+
 };
 
+/**
+ * @brief A simple calculator class.
+ */
 template <typename DataType>
 class Activations {
 
@@ -35,6 +43,9 @@ public:
 
     using Matrix = Eigen::Matrix<DataType, Eigen::Dynamic, Eigen::Dynamic>;
 
+    /* 
+    
+    */
     static const ActivationFunction<DataType> sigmoid;
     static const ActivationFunction<DataType> tanh;
     static const ActivationFunction<DataType> relu;
@@ -42,6 +53,9 @@ public:
 
 };
 
+/**
+ * @brief A simple calculator class.
+ */
 template <typename DataType>
 const ActivationFunction<DataType> Activations<DataType>::sigmoid = {
     // f(x)
@@ -55,6 +69,9 @@ const ActivationFunction<DataType> Activations<DataType>::sigmoid = {
     }
 };
 
+/**
+ * @brief A simple calculator class.
+ */
 template <typename DataType>
 const ActivationFunction<DataType> Activations<DataType>::identity = {
     // f(x)
@@ -67,6 +84,9 @@ const ActivationFunction<DataType> Activations<DataType>::identity = {
     }
 };
 
+/**
+ * @brief A simple calculator class.
+ */
 template <typename DataType>
 const ActivationFunction<DataType> Activations<DataType>::tanh = {
     [](const Matrix& x) -> Matrix {
@@ -77,6 +97,9 @@ const ActivationFunction<DataType> Activations<DataType>::tanh = {
     }
 };
 
+/**
+ * @brief A simple calculator class.
+ */
 template <typename DataType>
 const ActivationFunction<DataType> Activations<DataType>::relu = {
     [](const Matrix& x) -> Matrix {
@@ -87,6 +110,9 @@ const ActivationFunction<DataType> Activations<DataType>::relu = {
     }
 };
 
+/**
+ * @brief A simple calculator class.
+ */
 template <typename DataType>
 class MultiLayerPerceptron {
 
@@ -113,6 +139,9 @@ class MultiLayerPerceptron {
 
 public:
 
+    /**
+     * @brief A simple calculator class.
+     */
     MultiLayerPerceptron(
         const std::vector<int>& layers,
         const std::vector<Activation>& activations
@@ -123,12 +152,16 @@ public:
         initialize_weights();
     }
 
-    // Forward pass: X is (input_dim × batch_size)
+    /**
+     * @brief A simple calculator class.
+     * @param 
+     * @eturn 
+     */
     Matrix forward(const Matrix& X) {
         // The first layer has no activations ( we can jut include them 
         // in any preprocessing we need)
         A[0] = X;
-        
+        // Forward pass: X is (input_dim × batch_size)
         for (int l = 1; l < num_layers; ++l) {
             // Z[l] = W[l] * A[l-1] + b[l] (broadcasted with eigen)
             Z[l] = (W[l] * A[l - 1]).colwise() + b[l];
@@ -137,14 +170,23 @@ public:
         return A[num_layers - 1];
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     unsigned int input_size() const {
         return layer_sizes[0];
     }
     
+    /**
+     * @brief A simple calculator class.
+     */
     unsigned int output_size() const {
         return layer_sizes[num_layers - 1];
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     void backward(const Matrix& dLoss_dA_L) {
         int batch_size = dLoss_dA_L.cols();
 
@@ -168,21 +210,30 @@ public:
 
     }
 
-    // SGD update, the batch normalization factor is absorbed by the learning
-    // rate as standard.
+    /**
+     * @brief A simple calculator class.
+     */
     void apply_gradients(DataType lr) {
+        // SGD update, the batch normalization factor is absorbed by the learning
+        // rate as standard.
         for (int l = 1; l < num_layers; ++l) {
             W[l] -= lr * dW[l];
             b[l] -= lr * db[l];
         }
     }
 
-    const std::vector<Matrix>& get_weights() const { 
+    /**
+     * @brief A simple calculator class.
+     */    
+    const std::vector<Matrix>& get_weights() const {
         return W; 
     }
 
 private:
 
+    /**
+     * @brief A simple calculator class.
+     */
     void initialize_weights() {
 
         // Resize all the vector with the correct sizes. Note that this does
@@ -216,14 +267,13 @@ private:
 };
 
 
-template <typename DataType>
+template <typename DataType, typename Network>
 class NetworkTrainer {
 
     using Matrix = Eigen::Matrix< DataType, Eigen::Dynamic, Eigen::Dynamic>;
     // This is a COLUMN vector! otherwise eigen cries
     using Vector = Eigen::Matrix< DataType, Eigen::Dynamic, 1>;
 
-    using Network = MultiLayerPerceptron<DataType>;
     using LossFunction = autograd::ScalarFunction<DataType>;
     using LossGradient = autograd::VectorFunction<DataType>;
     using LastOutput = autograd::VectorVariable; 
@@ -245,11 +295,17 @@ class NetworkTrainer {
 
 public:
 
+    /**
+     * @brief A simple calculator class.
+     */
     NetworkTrainer( Network& network ): network(network), record_loss(false),
         record_verif_loss(false), loss_function(nullptr) {
         nvc.clear();
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     void set_loss_function(LossFunction* loss, LastOutput var, LastOutput ground_truth) {
         loss_function = loss;
         loss_function->derivative(gradient_generator, var);
@@ -257,15 +313,19 @@ public:
         ground_truth_variable = ground_truth;
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     void feed_additional_loss_variables(autograd::VectorVariable var, Vector& vector) {
         loss_eval_map.emplace(var, vector);
     }
 
     using VectorType = Eigen::Matrix<DataType, Eigen::Dynamic, 1>;
     using Dataset = VectorDataset< VectorType, VectorType >;
-    // Avoid something fancy like a generator expression for the 
-    // datasets to avoiding the handling of too much data at once, even though
-    // it would be a good idea in principle. 
+   
+    /**
+     * @brief A simple calculator class.
+     */
     void train(
         // The dataset
         unsigned int epochs,
@@ -275,7 +335,9 @@ public:
         unsigned int batch_size,
         double lr
     ) {
-
+        // Avoid something fancy like a generator expression for the 
+        // datasets to avoiding the handling of too much data at once, even though
+        // it would be a good idea in principle. 
         using namespace Eigen;
         if (data.size() < batch_size)
             throw std::runtime_error("Batch size too large for the dataset!");
@@ -327,26 +389,41 @@ public:
         network.apply_gradients(lr);
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     void notify_loss(double loss) {
 
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     void notify_verification_loss(double loss) {
 
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     void do_log_loss(bool value) {
         record_loss = value;
         if (value)
             nvc.register_name("Loss");
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     void do_log_verification_loss(bool value) {
         record_verif_loss = true;
         if (value)
             nvc.register_name("Verification loss");
     }
 
+    /**
+     * @brief A simple calculator class.
+     */
     void plot_loss(Plotter& plotter) {
         if (record_loss || record_verif_loss) {
 
@@ -355,6 +432,9 @@ public:
 
 protected:
 
+    /**
+     * @brief A simple calculator class.
+     */
     double compute_loss_over_dataset(Dataset& data) {
         // Use the current state of the weights to compute the loss
         double total_loss = 0.0;

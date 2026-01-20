@@ -27,10 +27,6 @@ public:
 		return memorized_amt;
 	}
 
-	// Get the weight joining the two units i and j
-	virtual inline DataType& get(state_index_t i, state_index_t j) = 0;
-
-
 	// Store a new patter in the internal weights.
 	virtual void store(BinaryState& bs) = 0;
 
@@ -85,7 +81,7 @@ public:
 		weights.reset();
 	}
 
-	inline DataType& get(state_index_t i, state_index_t j) override {
+	inline DataType& get(state_index_t i, state_index_t j) {
 		return weights(i, j);
 	}
 
@@ -122,7 +118,8 @@ public:
 		for (int i = 0; i < this->net_size; ++i)
 			intermediate(i) = (bs.get(i)) ? 1 : -1;
 		for (int unit_i = 0; unit_i < units.size(); ++unit_i) {
-			const auto& r = weights.row(units[unit_i]);
+			// Take the column (eigen has columnwise storage)
+			const auto& r = weights.col(units[unit_i]);
 			out.push_back(r.dot(intermediate));
 		}
 		return;
@@ -145,7 +142,7 @@ public:
 		this->memorized_amt++;
 		// const auto one_over_n = 1.0 / this->net_size;
 		for (int i = 0; i < this->net_size; ++i)
-			this->intermediate(i) = (bs.get(i))? 1 : -1;
+			this->intermediate(i) = (bs.get(i))? DataType(1) : DataType(-1);
 
 		// Note eigen optimizes this.
 		this->weights.noalias() += 
@@ -181,37 +178,33 @@ public:
 	virtual void store(BinaryState& bs) override {
 		unsigned int value = 0;
 
-
-
-
 		// The local fields need only be computed if some other
 		// weight has been stored in precedence.
 
 		this->memorized_amt++;
+		const int N = this->net_size;
+		// Convert pattern to ±1
+		for (int i = 0; i < N; ++i)
+			this->intermediate[i] = bs.get(i) ? DataType(1) : DataType(-1);
 
-		// We use our internal vector to compue the local field BEFORE
-		// adding the pattern, this is critical 
-		/*		const auto one_over_n = 1.0 / net_size;
+		auto& s = this->intermediate;
 
-		for (int i = 0; i < net_size; ++i)
-			for (int j = 0; j < net_size; ++j) {
-				if (i == j)
-					continue;
-				if (bs.get(i) && bs.get(j) || (!bs.get(i) && !bs.get(j)))
-					get(i, j) += one_over_n;
-				else get(i, j) -= one_over_n;
-			}
-		// Standard contribution
-		for (int i = 0; i < net_size; ++i)
-			for (int j = 0; j < net_size; ++j) {
-				if (i == j)
-					continue;
-				if (bs.get(i) && bs.get(j) || (!bs.get(i) && !bs.get(j)))
-					get(i, j) += one_over_n;
-				else get(i, j) -= one_over_n;
-			}
-		// Now add starkov-only local contributions:
-		*/
+		// Compute local fields BEFORE adding the new pattern, otherwise the computation
+		// completely messes up
+		if (this->memorized_amt > 1)
+			fields = this->weights * s;
+		else
+			fields.setZero();
+
+		// Note eigen optimizes this.
+		// First part is simply a hebbian rule
+		this->weights.noalias() +=
+			(this->intermediate * this->intermediate.transpose()) / N;
+		// Second part is a local orthogonal transformation 
+		this->weights.noalias() +=
+			(this->s * this->fields.transpose()) / (N * N);
+		this->weights.diagonal().setZero();
+
 		return;
 	}
 
@@ -220,9 +213,19 @@ public:
 template <typename DataType>
 class MatrixFreePolicy: public WeightingPolicy<DataType>{
 
+	LocalFields<DataType> intermediate;
+	// Keep a reference o all the images, O(N_data * k)
 	std::vector<std::reference_wrapper<BinaryState>> images;
+	state_size_t net_size;
+
+public:
+
+	MatrixFreePolicy(state_size_t size) : net_size(size)
+		// Do not allocate yet the weights to allow finegrained control.
+	{ }
 
 	void allocate() {
+		intermediate.resize(net_size);
 		// No explicit allocation, we recompute the values on the fly
 	}
 
@@ -233,6 +236,73 @@ class MatrixFreePolicy: public WeightingPolicy<DataType>{
 		images.clear();
 	}
 
+	virtual void store(BinaryState& bs) override {
+		images.push_back(std::reference_wrapper<BinaryState>(bs));
+		this->memorized_amt++;
+
+		return;
+	}
+
+	virtual DataType energy(const BinaryState& bs) override {
+		throw std::runtime_error("You are attempting to use a batch operation on an online weighting"
+		"policy. If you require batch computation, use batch weighting policies instead!");
+		return 0.0;
+	}
+
+	virtual DataType energy_flip(const BinaryState& bs, std::tuple<state_index_t, signed char> flip) override {
+		for (int i = 0; i < this->net_size; ++i)
+			intermediate(i) = (bs.get(i)) ? 1 : -1;
+
+		DataType hk = DataType(0);
+		// Again, compute the local dot product for the unit flip using the memorized patterns, computing
+		// the weights on the fly. 
+		unsigned int i = std::get<0>(flip);
+		for (unsigned int j = 0; j < net_size; ++j) {
+			DataType online_weight = compute_weight(i, j);
+			hk += intermediate[j] * online_weight;
+		}
+		return 2.0f * std::get<1>(flip) * hk; // energy change
+	}
+
+	// Compute the local fields across the entirety of the network. This
+	// leaves freedom of implementation for the activation function of the network. 
+	virtual void synch_update(BinaryState& bs, LocalFields<DataType>& fields) {
+		throw std::runtime_error("You are attempting to use a batch operation on an online weighting"
+			"policy. If you require batch computation, use batch weighting policies instead!");
+	}
+
+	virtual DataType compute_weight(state_index_t i, state_index_t j) {
+		DataType online_weight = DataType(0);
+		if (i == j)
+			return 0.0;
+		const DataType one_over_n = DataType(1) / this->net_size;
+		for (int state = 0; state < this->memorized_amt++; ++state) {
+			auto& bs = images[state].get();
+			if (bs.get(i) && bs.get(j) || (!bs.get(i) && !bs.get(j)))
+				online_weight += one_over_n;
+			else online_weight -= one_over_n;
+		}
+		return online_weight;
+	}
+
+	// Compute the local fields of a limited subgroups of the units
+	virtual void compute_local_fields(BinaryState& bs, std::vector<state_index_t> units,
+		std::vector<DataType>& out) {
+
+		for (int i = 0; i < this->net_size; ++i)
+			intermediate(i) = (bs.get(i)) ? DataType(1) : DataType(-1);
+		for (int unit_i = 0; unit_i < units.size(); ++unit_i) {
+			DataType local_field = DataType(0);
+			unsigned int i = units[unit_i];
+			for (unsigned int j = 0; j < net_size; ++j) {
+
+				DataType online_weight = compute_weight(i, j);
+				local_field += intermediate[j] * online_weight; 
+
+			}
+			out.push_back(local_field);
+		}
+	}
 };
 
 

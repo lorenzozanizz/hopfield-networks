@@ -34,7 +34,21 @@ find_package(OpenMP REQUIRED)
 find_package(Eigen3 REQUIRED) 
 
 # Merge all the cpp files in a single executable library. 
-add_library(executables "src/utils/timing.cpp")
+add_library(executables 
+
+    # --------- UTILS ---------
+    "src/utils/timing.cpp"
+    # --------- HOPFIELD ---------
+    "src/hopfield/classifier/hopfield_classifier.cpp"
+    "src/hopfield/states/binary.cpp"
+    # --------- IO ROUTINES ---------
+    "src/io/image/images.cpp"
+    "src/io/gif/gif.cpp"
+    "src/io/io_utils.cpp"
+)
+
+target_link_libraries(executables PRIVATE Eigen3::Eigen)
+target_link_libraries(executables PRIVATE OpenMP::OpenMP_CXX)
 
 add_executable(main "src/main.cpp")
 
