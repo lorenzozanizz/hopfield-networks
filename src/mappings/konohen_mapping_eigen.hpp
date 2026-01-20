@@ -373,7 +373,7 @@ private:
 	}
 
 	void allocate() {
-		Eigen::MatrixXd M( stimulus_cortex_input_size, mapping_cortex_width * mapping_cortex_height);
+		Eigen::Matrix<DataType, Eigen::Dynamic, Eigen::Dynamic>  M( stimulus_cortex_input_size, mapping_cortex_width * mapping_cortex_height);
 		weight_vectors = M;
 	}
 
@@ -435,6 +435,10 @@ public:
 
 	Eigen::MatrixXd::ConstColXpr get_weights(unsigned int x, unsigned int y) const {
 		return weight_vectors.col(x + y * mapping_cortex_width);
+	}
+
+	const Eigen::Matrix<DataType, Eigen::Dynamic, Eigen::Dynamic>& get_all_weights() const{
+		return weight_vectors;
 	}
 
 	// This function receives a collection of datavectors and has to train the mapping cortex

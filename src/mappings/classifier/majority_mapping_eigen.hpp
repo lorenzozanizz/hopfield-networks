@@ -104,9 +104,15 @@ public:
 		int width = trained_map.get_map_width();
 		int height = trained_map.get_map_height();  
 		for (int j = 0; j < height; ++j) 
-			for (int i = 0; i < width; ++i)
+			for (int i = 0; i < width; ++i) {
+				Plotter plotter;
 				// This function implicitly uses our hits map (histogram of the imputations) 
 				map_neuron_label(i, j) = most_frequent_hit(from_xy_to_idx(i, j));
+				//plotter.context().show_heatmap(trained_map.get_weights(i,j).data(), 28, 28, "gray");
+				//std::cout << "this is label : " << map_neuron_label(i, j) << "\n";
+				//plotter.block();
+			}
+				
 
 	}
 	/*Eigen::VectorXi map_batch(const Eigen::MatrixXd& batch) const {
