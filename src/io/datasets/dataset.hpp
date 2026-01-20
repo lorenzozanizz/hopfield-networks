@@ -101,11 +101,11 @@ public:
         return id_data.at(i);
     }
 
-    std::vector<XType> get_data() {
+    const std::vector<XType>& get_data() const{
         return x_data;
     }
 
-    std::vector<YType> get_labels() {
+    const std::vector<YType>& get_labels() const{
         return y_data;
     }
 
