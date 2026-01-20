@@ -5,18 +5,20 @@
 //
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
-// 
-#include "../../../external/gif.h"
+struct GifWriterInternal;
 
 class GifWriterIO {
 
 protected:
 
+	// Forward declaration PIMPL paradigm
+
 	// The gifwriter object g can be reinitialized when needed
-	GifWriter g;
+	std::unique_ptr<GifWriterInternal> g;
 
 	// Save this information for repeated calls to write each frame
 	// in the gif file. 
@@ -38,13 +40,14 @@ public:
 
 	static constexpr const unsigned int required_channels = 4;
 
-	GifWriterIO() { }
+	GifWriterIO();
 
 	GifWriterIO(const std::string name, unsigned int width, unsigned int height,
-		unsigned int delay): width(width), height(height), time_delay(delay), file_name(name)
-	{ }
+		unsigned int delay);
 
-	void begin(const std::string name, unsigned int w, unsigned int h,
+	~GifWriterIO();
+
+	inline void begin(const std::string name, unsigned int w, unsigned int h,
 		unsigned int delay) {
 		// Reinitialized the local state if the gif writer has to be
 		// passed around
@@ -52,23 +55,16 @@ public:
 		begin();
 	}
 
-	void begin() {
-		// Assumes that global variables have been already initialized
-		GifBegin(&g, file_name.data(), width, height, time_delay);
-	}
+	void begin();
 
-	void write_frame(unsigned char* raw_data) {
-		GifWriteFrame(&g, raw_data, width, height, time_delay);
-	}
+	void write_frame(unsigned char* raw_data);
 
-	void write_frame(std::vector<unsigned char> wrapped_data) {
+	inline void write_frame(std::vector<unsigned char> wrapped_data) {
 		// Simply extract the raw data
 		this->write_frame(wrapped_data.data());
 	}
 
-	void end() {
-		GifEnd(&g);
-	}
+	void end();
 
 	class WritingContext {
 		
@@ -79,7 +75,7 @@ public:
 			gf.begin();
 		}
 
-		void write(unsigned char* data) {
+		inline void write(unsigned char* data) {
 			gf.write_frame(data);
 		}
 
@@ -89,11 +85,11 @@ public:
 
 	};
 
-	WritingContext initialize_writing_context() {
+	inline WritingContext initialize_writing_context() {
 		return WritingContext(*this);
 	}
 
-	WritingContext initialize_writing_context(std::string file_name, int width, int height, int time_delay) {
+	inline WritingContext initialize_writing_context(std::string file_name, int width, int height, int time_delay) {
 		set_internal(file_name, width, height, time_delay);
 		return initialize_writing_context();
 	}
