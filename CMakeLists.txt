@@ -46,6 +46,7 @@ add_library(executables
     "src/io/gif/gif.cpp"
     "src/io/io_utils.cpp"
 )
+target_include_directories(executables PUBLIC "${CMAKE_SOURCE_DIR}/src")
 
 target_link_libraries(executables PRIVATE Eigen3::Eigen)
 target_link_libraries(executables PRIVATE OpenMP::OpenMP_CXX)
@@ -57,3 +58,10 @@ target_link_libraries(main PRIVATE executables)
 
 target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(main PRIVATE Eigen3::Eigen)
+
+add_executable(hopfield "examples/hopfield/hopfield.cpp")
+
+target_link_libraries(hopfield PRIVATE executables)
+
+target_link_libraries(hopfield PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(hopfield PRIVATE Eigen3::Eigen)
