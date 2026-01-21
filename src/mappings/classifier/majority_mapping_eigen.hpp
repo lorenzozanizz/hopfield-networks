@@ -103,37 +103,22 @@ public:
 		// assigning labels to neurons based on which label hit more time every neuron
 		int width = trained_map.get_map_width();
 		int height = trained_map.get_map_height();  
+
+		//for (int i = 0; i < height*width; ++i) {
+			// This function implicitly uses our hits map (histogram of the imputations) 
+			//map_neuron_label(x_from_idx(i), y_from_idx(i)) = most_frequent_hit(i);
+
+		//}
+
 		for (int j = 0; j < height; ++j) 
 			for (int i = 0; i < width; ++i) {
-				Plotter plotter;
 				// This function implicitly uses our hits map (histogram of the imputations) 
 				map_neuron_label(i, j) = most_frequent_hit(from_xy_to_idx(i, j));
-				//plotter.context().show_heatmap(trained_map.get_weights(i,j).data(), 28, 28, "gray");
-				//std::cout << "this is label : " << map_neuron_label(i, j) << "\n";
-				//plotter.block();
-			}
 				
+			}
 
 	}
-	/*Eigen::VectorXi map_batch(const Eigen::MatrixXd& batch) const {
-    const int B = batch.cols();
-    const int N = weight_vectors.cols();
 
-    Eigen::RowVectorXd w_norms = weight_vectors.colwise().squaredNorm();
-    Eigen::RowVectorXd x_norms = batch.colwise().squaredNorm();
-
-    Eigen::MatrixXd dist =
-        w_norms.transpose().replicate(1, B)
-      + x_norms.replicate(N, 1)
-      - 2.0 * weight_vectors.transpose() * batch;
-
-    Eigen::VectorXi bmus(B);
-    for (int b = 0; b < B; ++b)
-        dist.col(b).minCoeff(&bmus(b));
-
-    return bmus;
-}
-*/
 	// Warning! You can call this fuction only after calling classify()!
 	std::string label_for(int idx) {
 		int label_idx = map_neuron_label(x_from_idx(idx), y_from_idx(idx));
@@ -164,6 +149,20 @@ public:
 		}
 		return -1;
 	}
+
+	void plot_label_MNIST(Plotter& plotter, int label) {
+		// This function plots the MNIST images stored in the weights with the passed label. Unlabeled data is labeled with -1
+		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
+		
+			for (int j = 0; j < num_neurons; ++j) {
+				if (map_neuron_label(x_from_idx(j), y_from_idx(j)) == label) {
+					plotter.context().show_heatmap(trained_map.get_weights(j).data(), 28, 28, "gray");
+					std::cout << x_from_idx(j) << " , " << y_from_idx(j) << "\n";
+				}
+			}
+			plotter.block();
+	}
+	
 
 	void plot(Plotter& plotter) {
 
