@@ -51,6 +51,7 @@ public:
 		this->notify_on_begin(this->binary_state, iterations);
 		for (it = 1; it <= iterations; ++it) 
 		{
+
 			// Clear all the previously computed indices for the iteration
 			update_indexes.clear();
 			local_fields_out.clear();

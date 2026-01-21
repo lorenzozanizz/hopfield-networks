@@ -109,7 +109,6 @@ namespace DatasetRepo {
 		in.close();
 	}
 
-
 	// Here we ignore the labels, simply storing the data as a collection.
 	template <typename DataType>
 	void load_mnist_eigen(
@@ -130,35 +129,42 @@ namespace DatasetRepo {
 		std::string line;
 		int file_amount = 0;
 		unsigned int read_amt = 0;
+		unsigned int collected_keys = 0;
+
 		// Read "amount: N" 
 		if (std::getline(in, line)) {
 			std::istringstream iss(line);
 			std::string dummy; // dummy = "amount:" 
 			iss >> dummy >> file_amount;
 		}
+
+		// Variables to temporarily fill while reading the file
 		DataVector<DataType> vector(28 * 28);
+		vector.setZero();
+		unsigned int id, label;
+		std::string dummy;
+
 		while (std::getline(in, line)) {
+			// THIS WAS UPDATED TO FIX A BUG IN WHICH LABELS WOULD GET MESSED UP
 			// Skip away empty lines and comments 
-			unsigned int id, label;
-			if (line.empty() || line.rfind("#", 0) == 0) continue;
-			// --- id --- 
-			{
+
+			if (line.empty() || line.rfind("#", 0) == 0 || line.rfind("\n", 0) == 0)
+				continue;
+			else if (line.rfind("label", 0) == 0) {
+				// --- Ignore the label
+				collected_keys += 1;
+			}
+			else if (line.rfind("id", 0) == 0) {
+				// --- Id line parsing
 				std::istringstream iss(line);
-				std::string dummy;
 				iss >> dummy >> id; // dummy = "id:"
+				collected_keys += 1;
 			}
-			// --- label ---
-			std::getline(in, line);
-			{
+			else if (line.rfind("data", 0) == 0) {
+				// --- Data line parsing
+				collected_keys += 1;
 				std::istringstream iss(line);
-				std::string dummy;
-				iss >> dummy >> label; // dummy = "label:" 
-			}
-			// --- data --- 
-			std::getline(in, line);
-			{
-				std::istringstream iss(line);
-				std::string dummy; iss >> dummy;
+				iss >> dummy;
 				// "data:" 
 				DataType value;
 				for (int i = 0; i < 28 * 28; ++i) {
@@ -171,74 +177,31 @@ namespace DatasetRepo {
 				}
 			}
 
-			entries.add_sample(vector, id);
-			read_amt++;
-			if (read_amt >= amount)
-				break;
+			if (collected_keys == 3) {
+				// Reset the MNIST image reading context, to allow for variable order
+				// of data storage. 
+				collected_keys = 0;
+
+				entries.add_sample(vector, id);
+				read_amt++;
+				if (read_amt >= amount)
+					break;
+			}
 		}
+
+		in.close();
 	}
-
-
+	
 	void load_mnist_vector(
 		std::string path,
 		unsigned int amount,
 		VectorDataset<std::vector<unsigned char>, unsigned int>& values
-	) {
-		values.reserve(amount);
+	);
 
-		std::ifstream in(path);
-		if (!in)
-			throw std::runtime_error("Could not open the file stream to load the mnist dataset");
-
-		std::string line;
-		int file_amount = 0;
-
-		// Read "amount: N" 
-		if (std::getline(in, line)) {
-			std::istringstream iss(line);
-			std::string dummy; // dummy = "amount:" 
-			iss >> dummy >> file_amount;
-		}
-		unsigned int read_amt = 0;
-
-		// This version uses a c++ vector instead of an eigen vector
-		std::vector<unsigned char> vector(28 * 28);
-		while (std::getline(in, line)) {
-			// Skip away empty lines and comments 
-			unsigned int id, label;
-			if (line.empty() || line.rfind("#", 0) == 0) continue;
-			// --- id --- 
-			{
-				std::istringstream iss(line);
-				std::string dummy;
-				iss >> dummy >> id; // dummy = "id:"
-			}
-			// --- label ---
-			std::getline(in, line);
-			{
-				std::istringstream iss(line);
-				std::string dummy;
-				iss >> dummy >> label; // dummy = "label:" 
-			}
-			// --- data --- 
-			std::getline(in, line);
-			{
-				std::istringstream iss(line);
-				std::string dummy; iss >> dummy;
-				// "data:" 
-				int value;
-				for (int i = 0; i < 28 * 28; ++i) {
-					iss >> value;
-					vector[i] = value;
-				}
-			}
-			// DO NOT DISCRETIZE TO 0,1  INTERVAL IN THIS CONFIGURATION. 
-			values.add_sample(vector, label, id);
-			read_amt++;
-			if (read_amt >= amount)
-				break;
-		}
-	}
+	void load_mnist_ten_categories(
+		std::string path,
+		VectorDataset<std::vector<unsigned char>, unsigned int>& values
+	);
 
 	template <typename FloatingType>
 	using FloatVector = Eigen::Matrix<FloatingType, Eigen::Dynamic, 1>;
@@ -287,6 +250,7 @@ namespace DatasetRepo {
 		// These are also fixed, see the above link
 		constexpr const auto measurement_width = 187;
 		constexpr const auto num_categories = 5; 
+		unsigned int read = 0;
 
 		std::ifstream file(path);
 		std::string line;
@@ -294,6 +258,8 @@ namespace DatasetRepo {
 		FloatVector<FloatingType> one_hot(num_categories);
 		unsigned int line_no = 1;
 
+		// Read the header line once
+		std::getline(file, line);
 		while (std::getline(file, line)) {
 			if (line.empty() || line.rfind("#", 0) == 0) continue;
 
@@ -314,6 +280,9 @@ namespace DatasetRepo {
 			// and load it into the dataset. 
 
 			entries.add_sample(vector, one_hot, line_no);
+			read++;
+			if (read >= amount)
+				break;
 			line_no++;
 		}
 		return;

@@ -8,6 +8,7 @@
 #include <thread>
 #include <stdexcept>
 #include <sstream>
+#include <random>
 #include <iomanip>
 #include <tuple>
 
@@ -128,7 +129,7 @@ public:
 					std::to_string(xs.size()) + ", " + std::to_string(ys.size()));
 			}
 			const auto size = xs.size();
-			pipe.send_line("plot '-' using 1:2 with lines");
+			pipe.send_line("plot '-' using 1:2 with lines title 'Quantity'");
 			for (int i = 0; i < size; ++i) {
 				pipe.send_line(std::to_string(xs[i]) + " " + std::to_string(ys[i]));
 			}
@@ -170,17 +171,22 @@ public:
 		template <typename FloatingType>
 		PlottingContext& plot_multiple_heatmaps(
 			std::vector<FloatingType*> buffers, unsigned int plot_width, unsigned int plot_height,
-			unsigned int width, unsigned int height
+			unsigned int width, unsigned int height, const std::string& title = "Multiplot"
 		) {
-			pipe.send_line("set multiplot layout " + 
-				std::to_string(width) + "," + std::to_string(height));
+
 			pipe.send_line("unset key");
 			pipe.send_line("unset colorbox");
-			pipe.send_line("set size square");
 			pipe.send_line("set pm3d map");
-
+			pipe.send_line("set view map");
+			pipe.send_line("set yrange [*:*] reverse");
+			pipe.send_line("unset xlabel");
+			pipe.send_line("unset ylabel");
+			pipe.send_line("unset xtics");
+			pipe.send_line("unset ytics");
 			// Set the grayscale palettes. 
-			pipe.send_line("set palette rgbformula -7,2,-7");
+			pipe.send_line("set palette gray");
+			pipe.send_line("set multiplot layout " +
+				std::to_string(plot_width) + "," + std::to_string(plot_height) + " title '" + title + "'");
 
 			auto raw_pipe = pipe.raw();
 			for (int plot_i = 0; plot_i < plot_height; ++plot_i)
@@ -197,8 +203,10 @@ public:
 								fprintf(raw_pipe, "%f ", buffer[i * width + j]);
 						fprintf(raw_pipe, "\n");
 					}
+					fprintf(raw_pipe, "\n");
 					pipe.send_line("e");
 				}
+			pipe.send_line("unset multiplot");
 			return *this;
 		}
 
@@ -306,7 +314,6 @@ public:
 			return *this;
 		}
 
-	
 		PlottingContext& plot_multiple_sequence(std::vector<std::vector<double>> values) {
 			const unsigned long inner_size = values[0].size();
 			if (inner_size == 1) {
@@ -319,9 +326,9 @@ public:
 				// At least 2, so send a comma
 				pipe.send_line("plot '-' using 0:1 with lines title 'Line 0', \\");
 				for (int i = 1; i < inner_size - 1; ++i)
-					pipe.send_line(" '-' using 0:1 with lines, \\");
+					pipe.send_line(" '-' using 0:1 with lines title 'Line " + std::to_string(i) + "', \\");
 				if (inner_size >= 2)
-					pipe.send_line(" '-' using 0:1 with lines");
+					pipe.send_line(" '-' using 0:1 with lines title 'Line " + std::to_string(inner_size-1) + "'");
 				for (int i = 0; i < inner_size; ++i) {
 					for (int j = 0; j < values.size(); ++j)
 						pipe.send_line(std::to_string(values[j][i]));
@@ -360,16 +367,13 @@ public:
 		pipe.flush_send_end_of_data(0);
 		std::string v;
 		std::cout << "\x1b[0;33m" << 
-			"\n> ( PLOTTER NOTE ) Call to Plotter.block() issued: to continue, write 'continue' or 'clear' to close plots." << 
+			"> ( PLOTTER NOTE ) Call to Plotter.block() issued: to continue, write 'continue' or 'clear'" << 
 			"\x1b[0m" << std::endl;
 		do {
 			std::cin >> v;
 			// Make spin locking a bit loose...
-			std::this_thread::sleep_for(std::chrono::milliseconds(300));
+			// std::this_thread::sleep_for(std::chrono::milliseconds(300));
 		} while (!(v == "continue") && !(v == "clear"));
-
-		clear_all_plots();
-
 	}
 protected:
 

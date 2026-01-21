@@ -172,60 +172,39 @@ public:
 };
 
 template <typename DataType>
-class StarkovPolicy: public DensePolicy<DataType> {
+class StorkeyPolicy: public DensePolicy<DataType> {
 
-	WeightMatrix<DataType> weights;
-	// We use an extra vector to compute the local fields
-	// before appending a new vector. 
 	LocalFields<DataType> fields;
 
 public:
-
-	virtual void allocate() override {
-		// The number of elements to represent for the symmetric weight matrix is
-		// n * (n+1) where n is the network size
-		weights.resize(this->net_size, this->net_size);
-		fields.resize(this->net_size);
-		this->intermediate.resize(this->net_size);
-	}
-
-	StarkovPolicy(state_size_t size) : DensePolicy<DataType>(size)
+	StorkeyPolicy(state_size_t size) : DensePolicy<DataType>(size), fields(size)
 		// Do not allocate yet the weights to allow finegrained control.
 	{ }
 
 	virtual void store(BinaryState& bs) override {
-		unsigned int value = 0;
-
 		// The local fields need only be computed if some other
 		// weight has been stored in precedence.
 
 		this->memorized_amt++;
 		const int N = this->net_size;
+
 		// Convert pattern to ±1
 		for (int i = 0; i < N; ++i)
-			this->intermediate[i] = bs.get(i) ? DataType(1) : DataType(-1);
+			this->intermediate(i) = bs.get(i) ? DataType(1) : DataType(-1);
 
-		auto& s = this->intermediate;
+		auto hebbian_term = this->intermediate * this->intermediate.transpose();
+		auto net_inputs = this->weights * this->intermediate;
 
-		// Compute local fields BEFORE adding the new pattern, otherwise the computation
-		// completely messes up
-		if (this->memorized_amt > 1)
-			fields = this->weights * s;
-		else
-			fields.setZero();
+		auto pre_synaptic = this->intermediate * net_inputs.transpose();
 
-		// Note eigen optimizes this.
-		// First part is simply a hebbian rule
-		this->weights.noalias() +=
-			(this->intermediate * this->intermediate.transpose()) / N;
-		// Second part is a local orthogonal transformation 
-		this->weights.noalias() +=
-			(this->s * this->fields.transpose()) / (N * N);
+		auto post_synaptic = pre_synaptic.transpose();
+
+		this->weights.noalias() += (hebbian_term) / N;
+		this->weights.noalias() += (- pre_synaptic - post_synaptic) / (N * N);
 		this->weights.diagonal().setZero();
 
 		return;
 	}
-
 };
 
 template <typename DataType>

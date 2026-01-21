@@ -188,6 +188,10 @@ public:
 		this->binary_state.copy_content(init_state);
 	}
 
+	void plot_state(Plotter& p) {
+		StateUtils::plot_state(p, this->binary_state);
+	}
+
 	using Category = int;
 
 	void attach_classifier(HopfieldClassifier* classif) {

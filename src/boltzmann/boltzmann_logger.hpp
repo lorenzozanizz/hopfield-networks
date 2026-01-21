@@ -26,7 +26,6 @@ class BoltzmannLogger {
 
 	// The evolutions of the hidden states and the visible states may be
 	// very different as they represent different aspects of the memory. 
-	std::string hidden_gif_save;
 	std::string states_gif_save;
 
 	logger_buffer_t log_buf;
@@ -38,6 +37,17 @@ class BoltzmannLogger {
 
 	BoltzmannLogger() : record_visible(false), record_hidden(false),
 		record_energy(false) {
+
+	}
+
+	// Note: this sets the requirement to save the states collected in the selected .gif
+	void set_collect_states(bool value /*Note : I think that you are not using this variable in this scope*/,
+		const std::string& into = "states.gif",
+		unsigned int width = 0, unsigned int height = 0) {
+		record_visible = true;
+		states_gif_save = into;
+		visual_width = width;
+		visual_height = height;
 
 	}
 

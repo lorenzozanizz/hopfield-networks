@@ -46,7 +46,7 @@ public:
 	void run(
 		unsigned int num_threads,	
 		const unsigned long iterations,
-		std::unique_ptr<AnnealingScheduler> temp_sched,
+		std::unique_ptr<AnnealingScheduler>& temp_sched,
 		const UpdateConfig uc
 		// ^Describe whether we have asyncronous, synchronous or group updates.
 	) {

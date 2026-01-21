@@ -6,6 +6,7 @@
 #include <vector>
 #include <functional>
 #include <algorithm>
+#include <random>
 
 template <typename DataType, typename YType>
 class Dataset {
@@ -90,6 +91,10 @@ public:
     }
 
     const XType& x_of(index_t i) const {
+        return x_data.at(i);
+    }
+
+    XType& ref_of(index_t i) {
         return x_data.at(i);
     }
 
@@ -236,6 +241,11 @@ public:
         id_data.push_back(id);
     }
 
+    void clear() {
+        x_data.clear();
+        id_data.clear();
+    }
+
     index_t size() const { return x_data.size(); }
 
     void shuffle() {
@@ -245,6 +255,10 @@ public:
     }
 
     const XType& x_of(index_t i) const {
+        return x_data.at(i);
+    }
+
+    XType& ref_of(index_t i) {
         return x_data.at(i);
     }
 

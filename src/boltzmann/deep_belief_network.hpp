@@ -33,10 +33,14 @@ protected:
 
 public:
 
+	StackedRBM(std::vector<std::reference_wrapper<
+		RestrictedBoltzmannMachine<FloatingType>>> stack): machines_stack(stack) { }
+
 	void visualize_kernels_depthwise(
 		Plotter& plotter, 
-		unsigned int width, 
-		unsigned int height,
+		unsigned int plot_width, 
+		unsigned int plot_height,
+		unsigned int width, unsigned int height,
 		std::vector<unsigned int> how_many_per_layer, 
 		unsigned int from = 0,
 		unsigned int to = 0
@@ -54,15 +58,17 @@ public:
 		// Associate to each layer its list of image-fitted kernels. 
 		std::map<unsigned int, WeightKernels> layer_mappings;
 
-		if (!from && !to)
-			layer_mappings.reserve(machines_stack.size());
-		else layer_mappings.reserve(to - from + 1);
+		if (!from && !to) {
+			from = 0;
+			to = machines_stack.size() - 1;
+		}
 
+		layer_mappings[0] = machines_stack[0].get().get_weights();
 		// We need to construct all previous kernels, not just from "from" to "to"
 		for (unsigned int layer = 1; layer <= to; ++layer) {
 
 			machines_stack[layer].get().compute_higher_order_kernels(
-
+				layer_mappings[layer-1], layer_mappings[layer]
 			);
 			// Compute the new mapping using the mapping of the previous layer. 
 			// See the note above this function to see why we do it like this. 
@@ -74,11 +80,14 @@ public:
 			// Just views over the data, remember eigen has column_wise storage by default!
 			std::vector<FloatingType*> kernel_mappings;
 
-
 			// Get the amount of kernels to plot... 
 			const auto amount = how_many_per_layer[layer-from];
-			plotter.context().set_title("Kernels of machine of order " + std::to_string(layer))
-				.plot_multiple_heatmaps(kernel_mappings, width, height);
+			for (int i = 0; i < amount; ++i)
+				kernel_mappings.push_back(layer_mappings[layer].col(i).data());
+
+			plotter.context()
+				.plot_multiple_heatmaps(kernel_mappings, plot_width, plot_height, width, height,
+					"Kernels of machine of order " + std::to_string(layer));
 		}
 
 	}
@@ -93,10 +102,24 @@ public:
 	) {
 		// Use the references for all the boltzmann machines to pre-train the network. 
 
+		// We keep alternating references to collectiosn of vectors to represent data at a 
+		// earlier layer and mapped data into the hidden states. 
+		VectorCollection<Vector>  out_dataset(data.size());
 
-		// After each network is trained, the dataset is translated into its higher representation. 
-		// This unfortunately requires duplicating data, to avoid damagign the input data. 
+		VectorCollection<Vector>& earlier = data;
+		VectorCollection<Vector>& later = out_dataset;
 
+		for (int machine_index = 0; machine_index < machines_stack.size(); ++machine_index) {
+			auto& machine = machines_stack[machine_index].get();
+			machine.train_cd(epochs, earlier, batch_size, lr, k, decay);
+
+			// After each network is trained, the dataset is translated into its higher representation. 
+			// This unfortunately requires duplicating data, to avoid damagign the input data. 
+			if (machine_index < machines_stack.size() - 1)
+				machine.map_into_hidden(earlier, later, batch_size);
+			std::swap(earlier, later);
+			later.clear();
+		}
 
 	}
 

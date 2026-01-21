@@ -85,13 +85,6 @@ public:
     /**
      * @brief A simple calculator class.
      */
-    const Matrix& get_weights() const {
-        return weights;
-    }
-
-    /**
-     * @brief A simple calculator class.
-     */
     void initialize_weights(double std) {
         // Randomly initializes the weights. 
         std::normal_distribution<FloatingType> dist(0.0, std);
@@ -189,6 +182,10 @@ public:
         }
 
         notify_on_run_end();
+    }
+
+    Matrix& get_weights() {
+        return weights;
     }
 
     // https://www.cs.toronto.edu/~hinton/absps/guideTR.pdf
@@ -369,14 +366,14 @@ public:
      */
     void plot_higher_order_kernel(Plotter& p, unsigned int hidden_index, unsigned int width,
         unsigned int height, RestrictedBoltzmannMachine<FloatingType>& machine) {
-        // Use this as a weighted linear combination of the kernels ofthe higher order machine
-        auto& higher_weights_mat = machine.get_weights();
+        // Use this as a weighted linear combination of the kernels of the lower order machine
+        auto& lower_weights_mat = machine.get_weights();
 
         // NOTE: The matrix of the higher order is (visible_higher x hidden_higher )
         // and the matrix of the lower order is (hidden_higher, hidden_lower ) so we take 
         // a mat multiplication. 
 
-        Vector weighted_sum = higher_weights_mat * weights.col(hidden_index);
+        Vector weighted_sum = lower_weights_mat * weights.col(hidden_index);
         auto ctx = p.context();
         ctx.set_title("Higher Kernel").show_heatmap(weighted_sum.data(), width, height, "gray");
     }
@@ -384,8 +381,7 @@ public:
     /**
      * @brief A simple calculator class.
      */
-    void compute_higher_order_kernels( RestrictedBoltzmannMachine<FloatingType>& lower_machine, 
-        Matrix& out_location ) {
+    void compute_higher_order_kernels( Matrix& lower_semantic_weights, Matrix& out_location ) {
         // This function computes the higher order kernels for an upper layer in a DBN,
         // extending the above procedure to a matrix .
 
@@ -393,7 +389,7 @@ public:
         // meaning that if this-> machine has weights ( hidden x hidden_upper ), the upper machine has weights 
         // ( visible_before x hidden )  
         // the product obtains hidden_upper kernels of size visible_before to be reinterpreted as one wishes. 
-        out_location.noalias() = lower_machine.get_weights() * weights;
+        out_location.noalias() = lower_semantic_weights * weights;
 
     }
 

@@ -41,7 +41,7 @@ namespace StateUtils {
 			const unsigned int height = bs.get_size() / bs.get_stride_y();
 			const unsigned int width = bs.get_stride_y();
 
-
+			ctx.set_title("Binary State");
 			ctx.show_binary_image(bs.data(), width, height);
 		}
 	}
@@ -81,6 +81,10 @@ namespace StateUtils {
 
 		const auto width = bs.get_stride_y();
 		const auto height = bs.get_size() / bs.get_stride_y();
+
+		for (int i = 0; i < height; ++i)
+			for (int j = 0; j < width; ++j)
+				intermediate_buf[i * width + j] = (bs.high(i)) ? 255 : 0;
 
 		if (!width || !height)
 			throw std::runtime_error("Cannot write to image " + img + ": state has no interpretable stride");

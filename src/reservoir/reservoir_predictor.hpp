@@ -379,10 +379,10 @@ public:
             // These are logging routines to aid with training
 
             if (record_loss) {
-                notify_loss( compute_loss_over_dataset( data) );
+                notify_loss( compute_loss_over_dataset( data, batch_size ) );
             }
             if (record_verif_loss) {
-                notify_verification_loss( compute_loss_over_dataset( *verification_data ) );
+                notify_verification_loss( compute_loss_over_dataset( *verification_data , batch_size ) );
             }
         }
 
@@ -430,19 +430,37 @@ public:
         }
     }
 
-protected:
-
     /**
      * @brief A simple calculator class.
      */
-    double compute_loss_over_dataset(Dataset& data) {
+    double compute_loss_over_dataset(Dataset& data, unsigned int batch_size) {
         // Use the current state of the weights to compute the loss
         double total_loss = 0.0;
         const auto n_size = data.size();
-        for (int i = 0; i < n_size; ++i) {
-            loss_eval_map.clear();
+
+        Matrix batch_input(network.input_size(), batch_size);
+        Matrix batch_output(network.output_size(), batch_size);
+
+        for (auto batch : data.batches(batch_size)) {
+            // First we build the batched input matrix (Note that the i iterations are
+            // batch local indices, not global indices!)
+            for (size_t i = 0; i < batch.size(); ++i) {
+                batch_input.col(i) = batch.x_of(i);
+            }
+
+            batch_output = network.forward(batch_input);
+            
+            for (size_t i = 0; i < batch.size(); ++i) {
+                loss_eval_map.clear();
+                VectorType out_col = batch_output.col(i);
+                VectorType true_col = batch.y_of(i);
+
+                loss_eval_map.emplace(layer_variable, out_col);
+                loss_eval_map.emplace(ground_truth_variable, true_col);
+                total_loss += (*loss_function)(loss_eval_map);
+            }   
         }
-        return 1 / n_size;
+        return total_loss / n_size;
     }
 
 };

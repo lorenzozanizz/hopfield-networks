@@ -2,6 +2,8 @@
 #ifndef RESERVOIR_LOGGER_HPP
 #define RESERVOIR_LOGGER_HPP
 
+#include "../io/datasets/data_collection.hpp"
+
 #include "../math/matrix/matrix_ops.hpp"
 
 #include "../io/gif/gif.hpp"
@@ -29,7 +31,7 @@ class ReservoirLogger {
 	logger_buffer_t log_buf;
 	GifWriterIO gio;
 
-	using ReservoirState = Eigen::Matrix<DataType, Eigen::Dynamic, 1>;
+	using ReservoirState = Eigen::Matrix<DataType, Eigen::Dynamic, Eigen::Dynamic>;
 
 	NamedVectorCollection<double> nvc; /*Note: where is this class defined?? I cannot find it*/
     Plotter* plotter;
@@ -160,7 +162,7 @@ protected:
         // Cap the values in the 0, 255 range when writing. 
         uint32_t* int_buffer = reinterpret_cast<uint32_t*>(log_buf.write_buffer.get());
         for (int i = 0; i < state.size(); ++i) {
-            auto value = state(i);
+            auto value = state.data()[i];
             unsigned char v = static_cast<unsigned char>((value - min) / (max - min) * 255);
             uint32_t rgba = 0x0000000;
             rgba = (uint32_t(v) << 24) | // R 

@@ -15,7 +15,7 @@
 // really make sense in deterministic hopfield networks )
 // and updates are now deterministic, requiring stochastic runs.
 template <typename WeightingPolicy>
-class StochasticHopfieldNetwork: BaseHopfield<WeightingPolicy> {
+class StochasticHopfieldNetwork: public BaseHopfield<WeightingPolicy> {
 
 	using DataType = typename BaseHopfield<WeightingPolicy>::DataType;
 
@@ -49,7 +49,7 @@ public:
 
 	void run(
 		const unsigned long iterations,
-		std::unique_ptr<AnnealingScheduler> temp_sched,
+		std::unique_ptr<AnnealingScheduler>& temp_sched,
 		// Our annealing scheduling policy. 
 		const UpdateConfig uc 
 		// Describe whether we have asyncronous, synchronous or group updates.
@@ -80,7 +80,6 @@ public:
 			// Clear all the previously computed indices for the iteration
 			update_indexes.clear();
 			local_fields_out.clear();
-
 			if (uc.up == UpdatePolicy::Synchronous) {
 				// Entrust the weightpolicy to compute the dot values for the states. 
 				this->policy.synch_update(this->binary_state, this->local_fields);
@@ -101,7 +100,7 @@ public:
 
 				for (int i = 0; i < uc.group_size; ++i)
 					this->binary_state.set_value(update_indexes[i],
-						compute_value(this->local_fields_out[i], temp_sched->get_temp()));
+						compute_value(local_fields_out[i], temp_sched->get_temp()));
 
 				this->notify_state(update_indexes, this->binary_state);
 			}
@@ -115,7 +114,7 @@ public:
 					local_fields_out
 				);
 				// Apply the signum activation function and notify. 
-				this->binary_state.set_value(state_index, compute_value(this->local_fields_out[0], temp_sched->get_temp()));
+				this->binary_state.set_value(state_index, compute_value(local_fields_out[0], temp_sched->get_temp()));
 
 				this->notify_state(std::tuple(state_index, this->binary_state.get(state_index)));
 			}

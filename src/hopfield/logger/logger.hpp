@@ -57,6 +57,7 @@ protected:
     std::ofstream* f_out;
     NamedVectorCollection<float> nvc;
     Plotter* plotter;
+    std::string title_prefix;
 
     // Related to the order parameters.
     using Nuple = std::vector<double>;
@@ -80,13 +81,13 @@ protected:
 public:
 
     HopfieldLogger(Plotter* plot) : write_buffer(10), plotter(plot), record_states(false), record_energy(false),
-        record_temperature(false), record_order(false), f_out(nullptr), close_after(false)
+        record_temperature(false), record_order(false), f_out(nullptr), close_after(false), title_prefix()
     {
         interested_in.clear();
     }
 
     HopfieldLogger() : write_buffer(10), record_states(false), record_energy(false),
-        record_temperature(false), record_order(false), f_out(nullptr), close_after(false)
+        record_temperature(false), record_order(false), f_out(nullptr), close_after(false), title_prefix()
     {
         interested_in.clear();
     }
@@ -98,6 +99,10 @@ public:
     void set_recording_stream(std::ofstream& stream, bool close_aft = true) {
         f_out = &stream;
         close_after = close_aft;
+    }
+
+    void set_prefix(const std::string& prefix) {
+        title_prefix = prefix;
     }
 
     void set_buffered(bool v) { buffered = v; }
@@ -213,12 +218,12 @@ public:
                 if (!pair.second.size())
                     continue;
                 auto ctx = plotter->context();
-                ctx.set_title("Evolution of " + pair.first).
+                ctx.set_title(title_prefix + "Evolution of " + pair.first).
                     set_x_label("Iteration steps").plot_sequence(pair.second);
             }
             if (record_order) {
                 auto ctx = plotter->context();
-                ctx.set_title("Order parameters over time").set_x_label("Iteration steps").
+                ctx.set_title(title_prefix + "Order parameters over time").set_x_label("Iteration steps").
                     plot_multiple_sequence(parameters);
             }
         }

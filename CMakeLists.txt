@@ -1,11 +1,6 @@
 cmake_minimum_required(VERSION 3.12.0)
 
-# Set the required gfortran path explicitly, somehow does not work
-# with an export command.. whatever
-find_program(GFORTRAN_EXECUTABLE NAMES gfortran REQUIRED) 
-set(CMAKE_Fortran_COMPILER ${GFORTRAN_EXECUTABLE})
-
-project(project_title LANGUAGES CXX C Fortran)
+project(project_title LANGUAGES CXX C)
 
 # add_executable(prog "src/math/autograd/math.f90")
 
@@ -44,7 +39,8 @@ add_library(executables
     # --------- IO ROUTINES ---------
     "src/io/image/images.cpp"
     "src/io/gif/gif.cpp"
-    "src/io/io_utils.cpp"
+    "src/io/io_utils.cpp" 
+    "src/io/datasets/repository.cpp"
 )
 target_include_directories(executables PUBLIC "${CMAKE_SOURCE_DIR}/src")
 
@@ -60,8 +56,17 @@ target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(main PRIVATE Eigen3::Eigen)
 
 add_executable(hopfield "examples/hopfield/hopfield.cpp")
+add_executable(boltzmann "examples/boltzmann_machines/boltzmann.cpp")
+add_executable(reservoir "examples/reservoir/reservoir.cpp")
 
-target_link_libraries(hopfield PRIVATE executables)
+add_library(example_common INTERFACE)
+target_link_libraries(example_common
+    INTERFACE
+        OpenMP::OpenMP_CXX
+        Eigen3::Eigen
+        executables
+)
 
-target_link_libraries(hopfield PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(hopfield PRIVATE Eigen3::Eigen)
+target_link_libraries(hopfield PRIVATE example_common)
+target_link_libraries(reservoir PRIVATE example_common)
+target_link_libraries(boltzmann PRIVATE example_common)

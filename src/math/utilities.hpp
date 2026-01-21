@@ -3,6 +3,8 @@
 #define UTILITIES_HPP
 
 #include <cmath>
+#include <thread>
+#include <iostream>
 #include <vector>
 
 namespace Utilities {
