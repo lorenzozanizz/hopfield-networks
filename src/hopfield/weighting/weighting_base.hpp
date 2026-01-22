@@ -268,7 +268,7 @@ public:
 			"policy. If you require batch computation, use batch weighting policies instead!");
 	}
 
-	virtual DataType compute_weight(state_index_t i, state_index_t j) override {
+	DataType compute_weight(state_index_t i, state_index_t j) {
 		DataType online_weight = DataType(0);
 		if (i == j)
 			return 0.0;
@@ -307,7 +307,7 @@ public:
 		return;
 	}
 
-	virtual DataType compute_local_field(BinaryState& bs, state_index_t unit, bool overwrite) override {
+	virtual DataType compute_local_field(const BinaryState& bs, state_index_t unit, bool overwrite) override {
 		if (overwrite)
 			for (int i = 0; i < this->net_size; ++i)
 				intermediate(i) = (bs.get(i)) ? 1 : -1;

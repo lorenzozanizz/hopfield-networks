@@ -107,7 +107,7 @@ int main() {
 	std::cout << "> Begin mapping the dataset into nonlinear embedding " << std::endl;
 
 	Utilities::eigen_init_parallel(-1);
-	Eigen::setNbThreads(5);
+	Eigen::setNbThreads(1);
 
 	// On my architecture, 5 threads is optimal for this neural network architecture. 
 	// It is probably a balance between thread keeping overhead and matmul execution. 
@@ -126,7 +126,10 @@ int main() {
 
 	// Now declare the machinery for the neural network classifier to test the
 	// efficacy of the reservoir 
-	std::vector<int> units = { reservoir_size, 2000, 1000, 5 };
+
+	constexpr const auto N = 2000;
+
+	std::vector<int> units = { reservoir_size, N, N, 5 };
 	auto relu = Activations<float>::relu;
 	// We keep an identity activation at the final layer to run the cross entropy soft max
 	// loss function for the categorical problem
@@ -153,7 +156,7 @@ int main() {
 	std::cout << "> Initial verification loss: " << trainer.compute_loss_over_dataset(verification_ecg_embedded_repr, BATCH_SIZE) << std::endl;
 
 	trainer.train(
-		80,
+		120,
 		ecg_embedded_repr,
 		verification_ecg_embedded_repr, // no verification dataset
 		250,

@@ -84,15 +84,11 @@ int main() {
 		throw;
 	}
 
-	// ----------------------
-	// Plotting the results
-	// ----------------------
 	Plotter plotter;
-	classifier.plot(plotter);
-	for (int i = 0; i < 10 * 10; i += 9) {
-		plotter.context().set_title("Mapping weights").show_heatmap(km.get_weights(i).data(), 28, 28, "gray");
-	}
-	plotter.wait(); 
+
+	// Let us now visualize the trained weights that the mapping has associated with
+	// the predicted majority label of 4
+	classifier.plot_label_MNIST(plotter, -1);
 
 	// We now explore the ways in which we can exploit our topologically meaningful
 	// mapping to gain informations about the clusters in the original dataset. 

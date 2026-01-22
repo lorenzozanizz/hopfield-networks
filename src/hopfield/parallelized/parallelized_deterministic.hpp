@@ -4,6 +4,7 @@
 
 // Required for the activation function(s)
 #include <cmath>
+#include <omp.h>
 
 #include "../../math/utilities.hpp"
 #include "../network_base.hpp"
@@ -38,8 +39,8 @@ public:
 		}
 		else if (uc.up == UpdatePolicy::GroupUpdate) {
 			// Bound the amount of valeues to the size of the network. 
-			local_fields_out.resize( std::min(this->net_size, uc.group_size * num_threads) );
-			update_indexes.resize( std::min(this->net_size, num_threads * uc.group_size) );
+			local_fields_out.resize( std::min(this->network_size, (state_size_t) uc.group_size * num_threads) );
+			update_indexes.resize( std::min(this->network_size, (state_size_t) num_threads * uc.group_size) );
 		}
 
 		auto schedule = this->fix_computation_schedule();
@@ -81,7 +82,7 @@ public:
 				for (int i = 0; i < num_threads; ++i) {
 					local_fields_out[i] = this->policy.compute_local_field(
 						this->binary_state,
-						update_indexes[i]
+						update_indexes[i], false
 					);
 				}
 

@@ -53,7 +53,8 @@ target_link_libraries(main PRIVATE executables)
 target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(main PRIVATE Eigen3::Eigen)
 
-add_executable(hopfield "examples/hopfield/hopfield.cpp")
+add_executable(hopfield "examples/hopfield/parallelized_hopfield.cpp")
+add_executable(parallelized_hopfield "examples/hopfield/hopfield.cpp")
 add_executable(boltzmann "examples/boltzmann_machines/boltzmann.cpp")
 add_executable(plot "examples/plot_wrapper/plot.cpp")
 add_executable(konohen "examples/konohen/konohen.cpp")
@@ -81,6 +82,7 @@ target_link_libraries(example_common
 )
 
 target_link_libraries(blastest PRIVATE example_common)
+target_link_libraries(parallelized_hopfield PRIVATE example_common)
 target_link_libraries(hopfield PRIVATE example_common)
 target_link_libraries(reservoir PRIVATE example_common)
 target_link_libraries(mlp PRIVATE example_common)

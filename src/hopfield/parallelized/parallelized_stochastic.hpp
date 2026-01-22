@@ -2,15 +2,24 @@
 #ifndef PARALLEL_STOCHASTIC_HOPFIELD_NETWORK_HPP
 #define PARALLEL_STOCHASTIC_HOPFIELD_NETWORK_HPP
 
-// Required for the activation function(s)
 #include <cmath>
+#include <omp.h>
 
+// Required for the activation function(s)
 #include "../../math/utilities.hpp"
 #include "../network_base.hpp"
 #include "../weighting/weighting_base.hpp"
 
 #include "../stochastic/annealing_scheduler.hpp"
 
+/**
+ * @brief An implementation of a parallelized stochastic hopfield netowkr. 
+ * As per the determinsitic parallel implementation, the parallelism is distinguished
+ * on the required update policy for the network. Care must be taken when sampling: the
+ * sampler classes are localized per thread and seeded with the main seed when required.
+ * For more information on the parallelization choices see the comment in the deterministic
+ * implementation.
+*/
 template <typename WeightingPolicy>
 class ParallelStochasticHopfieldNetwork : public BaseHopfield<WeightingPolicy> {
 
@@ -22,7 +31,17 @@ class ParallelStochasticHopfieldNetwork : public BaseHopfield<WeightingPolicy> {
 		return 1 / (1 + std::exp(-2 * temperature * value));
 	}
 
+	/**
+	 * @brief Compute the value associated with the local field for the given temperature. 
+	 * This computes the boltzmann activation function. 
+	 * 
+	 * @param seed the seed for the generator
+	*/
 	signed char compute_value(DataType local_field, double temperature) {
+		// Each thread gets its own instance of this random-number generator.
+		// This avoids data races and guarantees reproducible, independent RNG
+		// sequences across threads
+		static thread_local std::mt19937 generator;
 		auto prob = boltzmann_probability(local_field, temperature);
 		std::uniform_real_distribution<float> uniform;
 		if (uniform(generator) < prob)
@@ -30,19 +49,34 @@ class ParallelStochasticHopfieldNetwork : public BaseHopfield<WeightingPolicy> {
 		return false;
 	}
 
-	// The generators need to be local to each thread to prevent data races
-	// when sampling!
-	static thread_local std::mt19937 generator;
+	unsigned long long last_seed;
 
 public:
 
-	ParallelStochasticHopfieldNetwork(state_size_t size) : BaseHopfield<WeightingPolicy>(size)
-	{ }
-
-	void seed(unsigned long long seed) {
-		generator.seed(seed);
+	ParallelStochasticHopfieldNetwork(state_size_t size) : BaseHopfield<WeightingPolicy>(size) {	
+		last_seed = 0xCAFEBABE;
+		seed(last_seed);
 	}
 
+	/**
+	 * @brief Seed the generator and save the seed
+	 * @param seed the seed for the generator
+	*/
+	void seed(unsigned long long seed) {
+		last_seed = seed;
+	}
+
+
+	/**
+	 * @brief Run the network on the present binary state, at each step instructing the logger
+	 * on the changes that affected the network. Based on the update configuration, various
+	 * kind of updates are applied. The temperature is scheduled equally for all threads. 
+	 * 
+	 * @param num_threads The number of threads
+	 * @param iterations The number of iterations
+	 * @param temp_sched The scheduler for the temperature
+	 * @param uc The configuration on each update, the type of update and the size. 
+	*/
 	void run(
 		unsigned int num_threads,	
 		const unsigned long iterations,
@@ -63,8 +97,8 @@ public:
 		}
 		else if (uc.up == UpdatePolicy::GroupUpdate) {
 			// Bound the amount of valeues to the size of the network. 
-			local_fields_out.resize(std::min(this->net_size, uc.group_size * num_threads));
-			update_indexes.resize(std::min(this->net_size, num_threads * uc.group_size));
+			local_fields_out.resize(std::min(this->network_size, (state_size_t) uc.group_size * num_threads));
+			update_indexes.resize(std::min(this->network_size, (state_size_t) num_threads * uc.group_size));
 		}
 
 		auto schedule = this->fix_computation_schedule();
@@ -93,7 +127,8 @@ public:
 				// Here we parallelize on our own: 
 				#pragma omp parallel for num_threads(num_threads)
 				for (int i = 0; i < this->network_size; ++i)
-					this->binary_state.set_value(i, compute_value(this->local_fields[i]), temp_sched->get_temp());
+					this->binary_state.set_value(i, compute_value(
+						this->local_fields[i], temp_sched->get_temp()));
 
 				this->notify_state(this->binary_state);
 			}
@@ -106,14 +141,14 @@ public:
 				for (int i = 0; i < num_threads; ++i) {
 					local_fields_out[i] = this->policy.compute_local_field(
 						this->binary_state,
-						update_indexes[i]
+						update_indexes[i], false
 					);
 				}
 
 				#pragma omp parallel for num_threads(num_threads)
 				for (int i = 0; i < uc.group_size; ++i)
 					this->binary_state.set_value(update_indexes[i],
-						compute_value(this->local_fields_out[i], temp_sched->get_temp() ));
+						compute_value(local_fields_out[i], temp_sched->get_temp() ));
 
 				this->notify_state(update_indexes, this->binary_state);
 			}
@@ -133,6 +168,8 @@ public:
 			temp_sched->update(it);
 		}
 
+		// Notify the logger that the run has ended. This may trigger IO operations such as
+		// writing images or gifs. 
 		this->notify_on_end(this->binary_state);
 
 		// Pop the "thread number stack" we had by interface contract.
@@ -144,7 +181,5 @@ public:
 	}
 
 };
-
-
 
 #endif // !DENSE_HOPFIELD_NETWORK_HPP
