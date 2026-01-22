@@ -82,26 +82,22 @@ public:
 				if (x != width - 1) {
 					float d_h = computing_distance(i, j);
 					u(2 * x + 1, 2 * y) = d_h; // horizontal distance
-					std::cout << "Writing in " << 2 * x + 1 << " , " << 2 * y << ": " << d_h <<"\n";
 
 				}
 				if (y != heigth - 1) {
 					float d_v = computing_distance(i, k);
 					u(2 * x, 2 * y + 1) = d_v; // vertical distance
-					std::cout << "Writing in " << 2 * x << " , " << 2 * y + 1 << ": " << d_v << "\n";
 
 				}
 
 				if ((x != width - 1) && (y != heigth - 1)) {
 					float d_d = computing_distance(i, z);
 					u(2 * x + 1, 2 * y + 1) = d_d; // diagonal distance
-					std::cout << "Writing in " << 2 * x + 1 << " , " << 2 * y + 1 << ": " << d_d << "\n";
 
 				}
 
 				double value = neighb_mean(2 * x, 2 * y);
 				u(2 * x, 2 * y) = value;
-				std::cout << "Writing in " << 2 * x  << " , " << 2 * y << ": " << value << "\n";
 
 			}
 		}

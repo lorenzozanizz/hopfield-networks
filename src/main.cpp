@@ -530,7 +530,7 @@ void clustering_MNIST() {
 	unsigned int input_size = 28 * 28;
 	unsigned int map_width = 6;
 	unsigned int map_height = 6;
-	unsigned int iterations = 300; // number of iterations to perform in the training of the Kohonen map
+	unsigned int iterations = 100; // number of iterations to perform in the training of the Kohonen map
 	unsigned int iteration_upd_sigma = 30; // after how many iterations we start to update sigma
 	double learning_rate = 0.30; // weight of the update in each iteration in the Kohonen map
 
@@ -561,17 +561,17 @@ void clustering_MNIST() {
 	
 	UMap.compute();
 	
-	//KMeans<double> kmeans(10);
-	//kmeans.fit_pp(km); // K++
+	KMeans<double> kmeans(10);
+	kmeans.fit_pp(km); // K++
 	// ----------------------
 	// Plotting the results 
 	// ----------------------
 	Plotter plotter;
 	UMap.plot(plotter);
-	//kmeans.plot(plotter);
+	kmeans.plot(plotter);
 
 	// Optional: see how are the clusters components
-	//kmeans.show_clusters(plotter, km);
+	kmeans.show_clusters(plotter, km);
 	
 
 }

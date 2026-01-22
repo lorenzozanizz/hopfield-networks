@@ -31,7 +31,7 @@ int main() {
 	// We create the mapping assigning it a width and height, and report the size
 	// of the input cortex. The mapping will associate items from the input distribution
 	// to winning units in the width x height lattice map
-	KonohenMapEigen<double> km(map_width, map_height, MNIST_SIZE * MNIST_SIZE);
+	KonohenMapEigen<double> km(map_width, map_height, MNIST_SIZE * MNIST_SIZE, 20);
 
 	// Evolving function parameters (how the sigma changes through the iterations)
 	// Other options: linear, piecewise and inverse_time 
