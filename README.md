@@ -23,7 +23,7 @@ git clone https://github.com/lorenzozanizz/hopfield-networks
 cd hopfield-networks
 mkdir build
 cd build
-cmake ..
+cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
 
