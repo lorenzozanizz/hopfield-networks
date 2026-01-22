@@ -22,87 +22,101 @@ public:
 	using Matrix = Eigen::Matrix<DataType, Eigen::Dynamic, Eigen::Dynamic>;
     using Vector = Eigen::VectorXi; 
 	using IndexVector = Eigen::VectorXi;
+
 	KMeans(int k, int max_iters = 10, double tol = 1e-4) : K(k), max_iters(max_iters), tol(tol) {}
+
+	// clustering with a random initialization
 	void fit(const KonohenMapEigen<DataType>& X) {
 		init_random(X);
 		for (int iter = 0; iter < max_iters; ++iter) {
 			assign_labels(X);
 			double shift = update_centroids(X);
-			if (shift < tol) {
+			if (shift < tol) { // stop if the update is less then a given threshold
 				std::cout << "Converged at iter " << iter << "\n";
 				break;
 			}
 		}
 	}
+
+	// clustering with K++-mean
 	void fit_pp(const KonohenMapEigen<DataType>& X) {
 		init_kmeans_pp(X);
-		// instead of init_random 
 		for (int iter = 0; iter < max_iters; ++iter) {
 			assign_labels(X);
 			double shift = update_centroids(X);
-			if (shift < tol) {
+			if (shift < tol) { // stop if the update is less then a given threshold
 				std::cout << "Converged at iter " << iter << "\n";
 				break;
 			}
 		}
 	}
+
+	// plot the clusters in a map
 	void plot(Plotter& plotter) {
 		std::vector<int> u_f(labels_.data(), labels_.data() + labels_.size());
 		plotter.context().set_title("K-Means")
-			//.show_heatmap(u_f.data(), W, H, "grey")]
-			.show_discrete_categories(u_f, W, H, 10) 
+			.show_discrete_categories(u_f, width, height, 10)
 			.set_cblabel("Distance");
 			plotter.block(); 
 	} 
-void show_clusters(Plotter& plotter, const KonohenMapEigen<DataType>& X) { 
-for (int i = 0; i < K; ++i) { 
-for (int j = 0; j < W * H; ++j) {
-if (labels_[j] == i){
-plotter.context().show_heatmap(X.get_weights(j).data(), 28, 28, "gray");
-} 
-} plotter.block(); 
-} } 
-const IndexVector& labels() const { return labels_; } 
-const Matrix& centroids() const { return centroids_; }
+
+	// plot every single cluster, in order to see if they are created properly (useful in MNIST)
+	void show_clusters(Plotter& plotter, const KonohenMapEigen<DataType>& X) { 
+		for (int i = 0; i < K; ++i) { 
+			for (int j = 0; j < width * height; ++j) {
+				if (labels_[j] == i){
+					plotter.context().show_heatmap(X.get_weights(j).data(), 28, 28, "gray");
+				} 
+			}
+			plotter.block(); 
+		} 
+	} 
+
+	const IndexVector& labels() const { return labels_; } 
+	const Matrix& centroids() const { return centroids_; }
+
 private: 
-	int K; 
-	int max_iters;
+	int K, max_iters, width, height; 
 	double tol; 
-	int H;
-	int W; 
 	Matrix centroids_; // D × K 
 	IndexVector labels_; // N 
+
+	// Initialize the centroids by taking K weights randomly
 	void init_random(const KonohenMapEigen<DataType>& X) { 
-		//Plotter plotter;
 		int N = X.get_map_width() * X.get_map_height();
-		W = X.get_map_width(); 
-		H = X.get_map_height(); 
+		width = X.get_map_width(); 
+		height = X.get_map_height(); 
 		int D = X.get_input_size(); 
 		centroids_.resize(D, K);
+
+		std::cout << "Initializing centroids randomly...\n";
+
 		std::mt19937 gen(std::random_device{}());
 		std::uniform_int_distribution<> dist(0, N - 1);
 		for (int k = 0; k < K; ++k) {
 			unsigned int idx = dist(gen); // sample a neuron index 
 			centroids_.col(k) = X.get_weights(idx); 
-			// plotter.context().show_heatmap(X.get_weights(idx).data(), 28, 28, "gray");
-			// std::cout << "this is label : " << k << "\n"; 
-			// plotter.block(); 
 		} 
 	} 
+
+	// Initialize the centroids using K++
 	void init_kmeans_pp(const KonohenMapEigen<DataType>& X) { 
 		int N = X.get_map_width() * X.get_map_height();
-		W = X.get_map_width(); 
-		H = X.get_map_height(); 
+		width = X.get_map_width();
+		height = X.get_map_height();
 		int D = X.get_input_size(); 
 		centroids_.resize(D, K); 
+
+		std::cout << "Initializing centroids using K++...\n";
+
 		std::mt19937 gen(std::random_device{}());
 		std::uniform_int_distribution<> uni_dist(0, N - 1); 
-		// ---- Step 1: choose first centroid randomly ---- 
+		// Choose first centroid randomly 
 		int first_idx = uni_dist(gen); 
 		centroids_.col(0) = X.get_weights(first_idx);
 		// Vector of min squared distances to nearest centroid
-		Eigen::VectorXd min_dists = Eigen::VectorXd::Constant(N, std::numeric_limits<DataType>::max());
-		// ---- Steps 2..K ---- 
+		Eigen::VectorXd min_dists = Eigen::VectorXd::Constant(N, std::numeric_limits<DataType>::max()); 
+		
 		for (int c = 1; c < K; ++c) { 
 			// Update distance to nearest existing centroid 
 			for (int i = 0; i < N; ++i) { 
@@ -112,7 +126,7 @@ private:
 			} // Probability distribution proportional to squared distances 
 			double sum = min_dists.sum(); 
 			if (sum == 0.0) { 
-				// All points identical : fallback to random 
+				// All points identical : use random 
 				centroids_.col(c) = X.get_weights(uni_dist(gen)); 
 				continue; 
 			} 
@@ -121,8 +135,9 @@ private:
 			centroids_.col(c) = X.get_weights(next_idx); 
 		} 
 	} 
+
+	// Assign every width of the Kohonen map to a cluster
 	void assign_labels(const KonohenMapEigen<DataType>& X) { 
-		//Plotter plotter;
 		int N = X.get_map_width() * X.get_map_height();
 		int D = X.get_input_size();
 		labels_.resize(N);
@@ -134,11 +149,10 @@ private:
 		// Assign labels
 		for (int i = 0; i < N; ++i) {
 			distances.col(i).minCoeff(&labels_(i));
-			// plotter.context().show_heatmap(X.get_weights(i).data(), 28, 28, "gray"); 
-			// std::cout << "label : " << labels_(i) << "\n"; 
-			// plotter.block(); 
 		} 
 	} 
+
+	// Updating the values of the centroids after the first iteration of K-means
 	double update_centroids(const KonohenMapEigen<DataType>& X) { 
 		int N = X.get_map_width() * X.get_map_height();
 		int D = X.get_input_size(); 
@@ -153,6 +167,7 @@ private:
 		} 
 		double shift = (centroids_ - new_centroids_).norm();
 		centroids_ = std::move(new_centroids_); 
+		// return the distance between the previous and the new centroids 
 		return shift; 
 	} 
 }; 

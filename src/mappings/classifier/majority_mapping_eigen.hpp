@@ -24,20 +24,23 @@ private:
 	using DoubleMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 	using IntMatrix = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>;
 
-	KonohenMapEigen<DataType>& trained_map;
+	KonohenMapEigen<DataType>& trained_map; // trained Kohonen map object reference
 	double threshold; // the percentage of hits required to label a neuron
 	std::map<int, std::string>  labels_map; // this maps a label idx to its label
 	std::map<int, Eigen::VectorXd> hits_map; // this maps a neuron idx to a vector that keeps track of how many times each label hits that neuron
 	IntMatrix map_neuron_label; // this maps a neuron idx to its label idx 
 
+	// converts the id to the corresponding x coordinate
 	const int x_from_idx(int idx) {
 		return idx % trained_map.get_map_width();
 	}
 
+	// converts the id to the corresponding y coordinate
 	const int y_from_idx(int idx) {
 		return idx / trained_map.get_map_width(); 
 	}
 
+	// converts the (x y) to the corresponding id
 	const int from_xy_to_idx(int x, int y) {
 		return x + y * trained_map.get_map_width();
 	}
@@ -76,6 +79,7 @@ public:
 
 		int input_size = trained_map.get_input_size();
 
+		// Iterating using batches, to improve vectorization
 		for (const auto& batch : dataset.batches(batch_size)) {
 
 			Eigen::MatrixXd X(input_size, batch_size); // rows X cols
@@ -104,12 +108,6 @@ public:
 		int width = trained_map.get_map_width();
 		int height = trained_map.get_map_height();  
 
-		//for (int i = 0; i < height*width; ++i) {
-			// This function implicitly uses our hits map (histogram of the imputations) 
-			//map_neuron_label(x_from_idx(i), y_from_idx(i)) = most_frequent_hit(i);
-
-		//}
-
 		for (int j = 0; j < height; ++j) 
 			for (int i = 0; i < width; ++i) {
 				// This function implicitly uses our hits map (histogram of the imputations) 
@@ -120,6 +118,7 @@ public:
 	}
 
 	// Warning! You can call this fuction only after calling classify()!
+	// Returns the label of a specific neuron
 	std::string label_for(int idx) {
 		int label_idx = map_neuron_label(x_from_idx(idx), y_from_idx(idx));
 		if (label_idx < 0) return "unlabeled";
@@ -127,6 +126,7 @@ public:
 	}
 
 	// Warning! You can call this fuction only after calling classify()!
+	// Returns the label of a specific neuron
 	std::string label_for(int x, int y) {
 		int label_idx = map_neuron_label(x, y);
 		if (label_idx < 0) return "unlabeled";
@@ -150,8 +150,9 @@ public:
 		return -1;
 	}
 
+
+	// This function plots the MNIST images stored in the weights with the passed label. Unlabeled data is labeled with -1
 	void plot_label_MNIST(Plotter& plotter, int label) {
-		// This function plots the MNIST images stored in the weights with the passed label. Unlabeled data is labeled with -1
 		int num_neurons = trained_map.get_map_width() * trained_map.get_map_height();
 		
 			for (int j = 0; j < num_neurons; ++j) {

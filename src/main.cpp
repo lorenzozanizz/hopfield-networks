@@ -439,6 +439,7 @@ void classification_MNIST() {
 	unsigned int map_width = 10;
 	unsigned int map_height = 10;
 	unsigned int iterations = 200; // number of iterations to perform in the training of the Kohonen map
+	unsigned int iteration_upd_sigma = 30; // after how many iterations we start to update sigma
 	double learning_rate = 0.20; // weight of the update in each iteration in the Kohonen map
 
 	// Evolving function parameters (how the sigma changes through the iterations)
@@ -456,7 +457,7 @@ void classification_MNIST() {
 	// ----------------------
 	// Create map and neighborhood
 	// ----------------------
-	KonohenMapEigen<double> km(map_width, map_height, input_size);
+	KonohenMapEigen<double> km(map_width, map_height, input_size, iteration_upd_sigma);
 	NeighbouringFunctionEigen nf(sigma0, tau, map_width, map_height, evolving_func);
 	nf.set_sigma_1(sigma1);
 	nf.set_beta(beta);
@@ -522,27 +523,28 @@ void clustering_MNIST() {
 	// ----------------------
 	// Loading MNIST
 	// ----------------------
-	VectorDataset<DoubleVector, unsigned int> mnist(100);
-	DatasetRepo::load_mnist_eigen("vector_mnist.data", 100, mnist);
+	VectorDataset<DoubleVector, unsigned int> mnist(500);
+	DatasetRepo::load_mnist_eigen("vector_mnist.data", 500, mnist);
 
 	// Map parameters
 	unsigned int input_size = 28 * 28;
 	unsigned int map_width = 6;
 	unsigned int map_height = 6;
-	unsigned int iterations = 200; // number of iterations to perform in the training of the Kohonen map
-	double learning_rate = 0.20; // weight of the update in each iteration in the Kohonen map
+	unsigned int iterations = 300; // number of iterations to perform in the training of the Kohonen map
+	unsigned int iteration_upd_sigma = 30; // after how many iterations we start to update sigma
+	double learning_rate = 0.30; // weight of the update in each iteration in the Kohonen map
 
 	// Evolving function parameters (how the sigma changes through the iterations)
 	std::string evolving_func = "exponential"; // Other options: linear, piecewise and inverse_time 
-	double sigma0 = 3.0;
-	double tau = 10.0;
+	double sigma0 = 4.0;
+	double tau = 15.0;
 	double sigma1 = 1.0; // used in the piecewise evolving function
 	double beta = 0.0; // used in the inverse_time method
 
 	// ----------------------
 	// Create map and neighborhood
 	// ----------------------
-	KonohenMapEigen<double> km(map_width, map_height, input_size);
+	KonohenMapEigen<double> km(map_width, map_height, input_size, iteration_upd_sigma);
 	NeighbouringFunctionEigen nf(sigma0, tau, map_width, map_height, evolving_func);
 
 	// ----------------------
@@ -564,7 +566,7 @@ void clustering_MNIST() {
 	kmeans.plot(plotter);
 
 	// Optional: see how are the clusters components
-	//kmeans.show_clusters(plotter, km);
+	kmeans.show_clusters(plotter, km);
 	
 
 }

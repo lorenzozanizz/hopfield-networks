@@ -49,7 +49,7 @@ private:
 public:
 
 	NeighbouringFunctionEigen(double sigma_0, double tau, unsigned int map_width, unsigned int map_height, std::string& evolving_func)
-		:sigma_0(sigma_0), tau(tau), map_width(map_width), map_height(map_height) {
+		:sigma_0(sigma_0), tau(tau), map_width(map_width), map_height(map_height){
 		this->set_sigma_evolving_function(evolving_func);
 		this->sigma = sigma_0;
 	}
@@ -226,8 +226,8 @@ public:
 				// When we reach it, we add on y and restart from x. We set the end of the iteration on (x_end, y_end) 
 				// where x_end = min(grid width,  winning.x + radius) and y_end = min(grid height,  winning.y + radius).
 
-
 				int next_x, next_y;
+
 				// checking if the next x will be in the square and checking if the next x will in the map domain
 				if (static_cast<int>(current_x) - static_cast<int>(winner_x) < support && current_x < owner->get_map_width() - 1) {
 					// if so, we add on x
@@ -235,7 +235,7 @@ public:
 					next_y = current_y;
 				}
 				else {
-					// if not, we update both y and x
+					// if not, we update both y and x (we go to the next line)
 					next_y = current_y + 1;
 					next_x = std::max(0, static_cast<int>(winner_x) - static_cast<int>(support));
 				}
@@ -264,6 +264,7 @@ public:
 			return (current_y);
 		}
 
+		// returns 
 		double contribution_weight() const {
 
 			unsigned int map_width = owner->get_map_width();
@@ -365,7 +366,7 @@ private:
 	unsigned int mapping_cortex_width;
 	unsigned int mapping_cortex_height;
 	unsigned int stimulus_cortex_input_size;
-
+	unsigned int evolving_sigma_time;
 	dimension dim;
 
 
@@ -388,20 +389,22 @@ private:
 
 public:
 
-	KonohenMapEigen(unsigned int cortex_size, unsigned int input_size) :
-		mapping_cortex_width(cortex_size), mapping_cortex_height(1), stimulus_cortex_input_size(input_size) {
+	KonohenMapEigen(unsigned int cortex_size, unsigned int input_size, unsigned int evolving_sigma_time) :
+		mapping_cortex_width(cortex_size), mapping_cortex_height(1), stimulus_cortex_input_size(input_size), evolving_sigma_time(evolving_sigma_time){
 		dim = ONE_D;
 		
 	}
 
-	KonohenMapEigen(unsigned int cortex_width, unsigned int cortex_height, unsigned int input_size) :
-		mapping_cortex_width(cortex_width), mapping_cortex_height(cortex_height), stimulus_cortex_input_size(input_size) {
+	KonohenMapEigen(unsigned int cortex_width, unsigned int cortex_height, unsigned int input_size, unsigned int evolving_sigma_time) :
+		mapping_cortex_width(cortex_width), mapping_cortex_height(cortex_height), stimulus_cortex_input_size(input_size), evolving_sigma_time(evolving_sigma_time) {
 		dim = TWO_D;
 		
 	}
 
+	// Initializing the weights of Kohonen map with a given seed
 	void initialize(unsigned long long seed) {
 		allocate();
+		std::cout << "Initializing initial weights...\n";
 		std::mt19937 rng(seed);
 		std::uniform_real_distribution<DataType> dist(0.0, 1.0);
 		// assigning for each neuron's component a random value from 0.0 to 1.0
@@ -412,12 +415,13 @@ public:
 		}
 	}
 
-
+	// Initializing the weights of Kohonen map using Eigen (should be more efficient)
 	void initialize() {
+		std::cout << "Initializing initial weights...\n";
 		weight_vectors = Eigen::MatrixXd::Random(stimulus_cortex_input_size, mapping_cortex_width * mapping_cortex_height);
 	}
 	
-
+	// Returns the size of a single weight vector
 	const int get_input_size() const {
 		return stimulus_cortex_input_size;
 	}
@@ -430,14 +434,19 @@ public:
 		return mapping_cortex_height;
 	}
 
+	// Returns the weights with the passed index. 
+	// Note: the type passed is a reference to the column, to avoid useless copies
 	Eigen::MatrixXd::ConstColXpr get_weights(unsigned int neuron_idx) const {
 		return weight_vectors.col(neuron_idx);
 	}
 
+	// Returns the weights in position (x, y). 
+	// Note: the type passed is a reference to the column, to avoid useless copies
 	Eigen::MatrixXd::ConstColXpr get_weights(unsigned int x, unsigned int y) const {
 		return weight_vectors.col(x + y * mapping_cortex_width);
 	}
 
+	// Returns a reference to the weights matrix
 	const Eigen::Matrix<DataType, Eigen::Dynamic, Eigen::Dynamic>& get_all_weights() const{
 		return weight_vectors;
 	}
@@ -450,6 +459,7 @@ public:
 
 		MultiProgressBar prog_bar(iterations);
 		std::cout << "training...\n";
+
 		for (unsigned int t = 0; t < iterations; t++) {
 			prog_bar.update(t);
 			for (const auto& input : data.get_data()) {
@@ -463,10 +473,8 @@ public:
 					for (auto it = nf.begin(bmu); it != nf.end(bmu); ++it) {
 						unsigned int idx = it.index();
 						double h = it.contribution_weight();
-
 						// update weights of neuron idx
 						weight_vectors.col(idx) += learning_rate * h * (input - weight_vectors.col(idx));
-
 					}
 
 				}
@@ -474,29 +482,30 @@ public:
 
 					int bmu_x = x_from_idx(bmu);
 					int bmu_y = y_from_idx(bmu);
-
 					// iterate over neighbors of BMU
 					for (auto it = nf.begin(bmu_x, bmu_y); it != nf.end(bmu_x, bmu_y); ++it) {
-
 						unsigned int idx = it.index();
 						double h = it.contribution_weight();
 						// update weights of neuron idx
 						weight_vectors.col(idx) += learning_rate * h * (input - weight_vectors.col(idx));
-
 					}
 
 				}
 
 			}
-			// evolve neighborhood radius
-			nf.evolve_sigma(t);
+			// evolve neighborhood radius after a selected iteration
+			if (t > evolving_sigma_time) {
+				nf.evolve_sigma(t);
+			}
 		}
 	}
 
+	// mapping a collection of vectors (we used a matrix) to the nearest neurons
 	Eigen::VectorXi map(const Eigen::MatrixXd& batch) const {
 		const int B = batch.cols();
 		const int N = weight_vectors.cols();
 
+		// using .colwise() to increase vectorization
 		Eigen::RowVectorXd w_norms = weight_vectors.colwise().squaredNorm();
 		Eigen::RowVectorXd x_norms = batch.colwise().squaredNorm();
 
@@ -509,7 +518,7 @@ public:
 		return bmus;
 	}
 
-
+	// mapping a vector to the nearest neuron
 	unsigned int map(const Eigen::VectorXd& x) const {
 		unsigned int winner = 0;
 		(weight_vectors.colwise() - x).colwise().norm().minCoeff(&winner);
