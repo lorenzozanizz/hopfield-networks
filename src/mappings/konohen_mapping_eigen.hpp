@@ -169,6 +169,7 @@ public:
 
 	}
 
+
 	// Providing an iterator over the neurons in a way that is transparent to the mapping 
 	class Iterator {
 
@@ -445,10 +446,10 @@ public:
 	void train(const VectorDataset<DoubleVector, unsigned int>& data,
 		unsigned int iterations,
 		NeighbouringFunctionEigen& nf,
-		double learning_rate = 0.1) {
+		double learning_rate = 0.6) {
 
 		MultiProgressBar prog_bar(iterations);
-
+		std::cout << "training...\n";
 		for (unsigned int t = 0; t < iterations; t++) {
 			prog_bar.update(t);
 			for (const auto& input : data.get_data()) {
@@ -519,7 +520,7 @@ public:
 	void plot_10_kernel(Plotter plotter, int n) {
 		// This plots 10 weights. Useful in our application of MNIST to see if our kernel is "memorizing"
 		// the images correctly.
-		for (int i = 0; i < 10 * 10; i += 9) {
+		for (int i = 0; i < mapping_cortex_width*mapping_cortex_height; i += 9) {
 			plotter.context().show_heatmap(get_weights(i).data(), 28, 28, "gray");
 		} 
 		plotter.block(); // NOTE: this is to move in the function that calls this, is here to remember 
