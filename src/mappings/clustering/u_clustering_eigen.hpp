@@ -64,9 +64,8 @@ public:
 		int ymin = std::max(0, y - 1);
 		int ymax = std::min(static_cast<int>(u_heigth) - 1, y + 1);
 
-		return u.block(ymin, xmin,
-			ymax - ymin + 1,
-			xmax - xmin + 1).mean();
+		return u.block(xmin, ymin,
+		xmax - xmin + 1,ymax - ymin + 1).mean();
 	}
 
 
@@ -83,19 +82,26 @@ public:
 				if (x != width - 1) {
 					float d_h = computing_distance(i, j);
 					u(2 * x + 1, 2 * y) = d_h; // horizontal distance
+					std::cout << "Writing in " << 2 * x + 1 << " , " << 2 * y << ": " << d_h <<"\n";
 
 				}
 				if (y != heigth - 1) {
 					float d_v = computing_distance(i, k);
 					u(2 * x, 2 * y + 1) = d_v; // vertical distance
+					std::cout << "Writing in " << 2 * x << " , " << 2 * y + 1 << ": " << d_v << "\n";
+
 				}
 
 				if ((x != width - 1) && (y != heigth - 1)) {
 					float d_d = computing_distance(i, z);
 					u(2 * x + 1, 2 * y + 1) = d_d; // diagonal distance
+					std::cout << "Writing in " << 2 * x + 1 << " , " << 2 * y + 1 << ": " << d_d << "\n";
+
 				}
 
-				u(2 * x, 2 * y) = neighb_mean(2 * x, 2 * y);
+				double value = neighb_mean(2 * x, 2 * y);
+				u(2 * x, 2 * y) = value;
+				std::cout << "Writing in " << 2 * x  << " , " << 2 * y << ": " << value << "\n";
 
 			}
 		}

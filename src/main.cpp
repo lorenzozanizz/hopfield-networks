@@ -523,8 +523,8 @@ void clustering_MNIST() {
 	// ----------------------
 	// Loading MNIST
 	// ----------------------
-	VectorDataset<DoubleVector, unsigned int> mnist(500);
-	DatasetRepo::load_mnist_eigen("vector_mnist.data", 500, mnist);
+	VectorDataset<DoubleVector, unsigned int> mnist(200);
+	DatasetRepo::load_mnist_eigen("vector_mnist.data", 200, mnist);
 
 	// Map parameters
 	unsigned int input_size = 28 * 28;
@@ -557,16 +557,21 @@ void clustering_MNIST() {
 	// ----------------------
 	// Initializing the K-Means and performing the clustering
 	// ----------------------
-	KMeans<double> kmeans(10);
-	kmeans.fit_pp(km); // K++
+	UClusteringEigen UMap(km);
+	
+	UMap.compute();
+	
+	//KMeans<double> kmeans(10);
+	//kmeans.fit_pp(km); // K++
 	// ----------------------
 	// Plotting the results 
 	// ----------------------
 	Plotter plotter;
-	kmeans.plot(plotter);
+	UMap.plot(plotter);
+	//kmeans.plot(plotter);
 
 	// Optional: see how are the clusters components
-	kmeans.show_clusters(plotter, km);
+	//kmeans.show_clusters(plotter, km);
 	
 
 }
