@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.12.0)
 
 project(project_title LANGUAGES CXX C)
 
-# add_executable(prog "src/math/autograd/math.f90")
-
 find_program(GNUPLOT_EXECUTABLE gnuplot)
 
 if (GNUPLOT_EXECUTABLE)
@@ -57,9 +55,24 @@ target_link_libraries(main PRIVATE Eigen3::Eigen)
 
 add_executable(hopfield "examples/hopfield/hopfield.cpp")
 add_executable(boltzmann "examples/boltzmann_machines/boltzmann.cpp")
+add_executable(plot "examples/plot_wrapper/plot.cpp")
+add_executable(konohen "examples/konohen/konohen.cpp")
 add_executable(reservoir "examples/reservoir/reservoir.cpp")
+add_executable(blastest "examples/blas/blas.cpp")
+add_executable(mlp "examples/mlp/mlp.cpp")
 
 add_library(example_common INTERFACE)
+
+target_compile_options(example_common INTERFACE
+    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:Release>:-march=native>
+)
+
+# Disable debug checks
+target_compile_definitions(example_common INTERFACE
+    $<$<CONFIG:Release>:NDEBUG>
+)
+
 target_link_libraries(example_common
     INTERFACE
         OpenMP::OpenMP_CXX
@@ -67,6 +80,10 @@ target_link_libraries(example_common
         executables
 )
 
+target_link_libraries(blastest PRIVATE example_common)
 target_link_libraries(hopfield PRIVATE example_common)
 target_link_libraries(reservoir PRIVATE example_common)
+target_link_libraries(mlp PRIVATE example_common)
+target_link_libraries(konohen PRIVATE example_common)
 target_link_libraries(boltzmann PRIVATE example_common)
+target_link_libraries(plot PRIVATE example_common)

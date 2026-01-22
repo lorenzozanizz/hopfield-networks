@@ -41,7 +41,7 @@ int main() {
     // Display as a heatmap using a grayscale-to-blue palette
     plotter.context()
         .set_title("Weight Matrix Heatmap")
-        .show_heatmap(heatmap_data.data(), width, height, "rgbformula 7,5,15");
+        .show_heatmap(heatmap_data.data(), width, height, "grey");
 
     // --- EXAMPLE 3: MULTIPLE SEQUENCES (Order Parameters) ---
     // Visualizing how multiple stored patterns overlap during retrieval

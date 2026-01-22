@@ -138,8 +138,17 @@ public:
 		}
 
 		template <typename YType>
-		PlottingContext& plot_sequence(const std::vector<YType>& ys) {
-			pipe.send_line("plot '-' using 0:1 with lines");
+		PlottingContext& plot_sequence(const std::vector<YType>& ys, const std::string& title = "Line") {
+			pipe.send_line("plot '-' using 0:1 with lines title '" + title + "'");
+			for (int i = 0; i < ys.size(); ++i)
+				pipe.send_line(std::to_string(ys[i]));
+			pipe.send_line("e");
+			return *this;
+		}
+
+		template <typename Indexable>
+		PlottingContext& plot_indexable(const Indexable& ys, const std::string& title = "Line") {
+			pipe.send_line("plot '-' using 0:1 with lines title '" + title + "'");
 			for (int i = 0; i < ys.size(); ++i)
 				pipe.send_line(std::to_string(ys[i]));
 			pipe.send_line("e");
@@ -183,6 +192,7 @@ public:
 			pipe.send_line("unset ylabel");
 			pipe.send_line("unset xtics");
 			pipe.send_line("unset ytics");
+			pipe.send_line("set size ratio -1");
 			// Set the grayscale palettes. 
 			pipe.send_line("set palette gray");
 			pipe.send_line("set multiplot layout " +
@@ -271,7 +281,6 @@ public:
 					pipe.send_line(std::to_string(i) + " \"" + random_color() + "\", \\");
 			}
 			pipe.send_line(std::to_string(num_categories-1) + " \"" + random_color() + "\")");
-			std::cout << "set cbtics 0,1," + std::to_string(num_categories) << std::endl;
 			pipe.send_line("set cbtics 0,1," + std::to_string(num_categories));
 			auto raw_pipe = pipe.raw();
 			pipe.send_line("plot '-' matrix with image");
@@ -352,10 +361,6 @@ public:
 		pipe.send_line("set term " + terminal);
 	}
 
-	void read_gp_file(const std::string) {
-
-	}
-
 	~Plotter() {
 		// We do not close explicitly the pipe in this version to avoid
 		// double freeing
@@ -375,19 +380,27 @@ public:
 			// std::this_thread::sleep_for(std::chrono::milliseconds(300));
 		} while (!(v == "continue") && !(v == "clear"));
 	}
+
+	void wait() {
+		// NOTE: In this alternative to block() we do not flush the content  of the
+		// pipe to gnuplot immediately!
+		std::string v;
+		std::cout << "\x1b[0;33m" <<
+			"> ( PLOTTER NOTE ) Call to Plotter.block() issued: to continue, write 'continue' or 'clear'" <<
+			"\x1b[0m" << std::endl;
+		do {
+			std::cin >> v;
+			// Make spin locking a bit loose...
+			// std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		} while (!(v == "continue") && !(v == "clear"));
+	}
+
 protected:
 
 	void clear_all_plots() {
 		for (int i = 1; i < this->plot_id; ++i) {
 			this->pipe.send_line("set terminal wxt " + std::to_string(i) + " close");
 		}
-	}
-
-
-	// Utility function to write the stream of data in the gnuplot
-	// pipe
-	void write_x_y_pairs() {
-
 	}
 
 }; // ! class Plotter

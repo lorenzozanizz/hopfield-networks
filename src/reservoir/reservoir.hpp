@@ -2,11 +2,13 @@
 #ifndef RESERVOIR_HPP
 #define RESERVOIR_HPP
 
+#include <omp.h>
 #include <cmath>
 
 #include "reservoir_logger.hpp"
 // Import sparse matrix required for the intra-reservoir dynamics.
 #include "../math/matrix/matrix_ops.hpp"
+#include "../math/utilities.hpp"
 
 // Required for the mapping procedure.
 #include "../io/datasets/dataset.hpp"
@@ -89,7 +91,6 @@ public:
 		std::uniform_real_distribution<float> unif(0, 1);
 		std::normal_distribution<DataType> norm(0, 1 / std::sqrt(state_dim) );
 		
-
 		triplets_vector.reserve(static_cast<long>(state_dim * state_dim * sparsity));
 		for (int i = 0; i < state_dim; ++i)
 			for (int j = 0; j < state_dim; ++j) {
@@ -101,7 +102,6 @@ public:
 		echo_weights.setFromTriplets(triplets_vector.begin(), triplets_vector.end());
 		double current_radius = MathOps::sparse_power_method(echo_weights);
 
-		std::cout << "Correction factor: " << spectral_radius_desired / current_radius;
 		if (current_radius > 0)
 			echo_weights *= (spectral_radius_desired / current_radius);
 
@@ -153,6 +153,16 @@ public:
 		notify_on_state_change();
 	}
 
+	void run(const Input& u) {
+		ReservoirState pre_activation;
+		pre_activation = echo_weights * state + input_weights * input_state;
+		// RELU activation function 
+		state = pre_activation.array().cwiseMax(0.0f).matrix();
+		// Delete the previous input, e.g. this is 1 time use only. 
+		notify_on_norm_change();
+		notify_on_state_change();
+	}
+
 	void reset() {
 		state.setZero();
 	}
@@ -163,26 +173,23 @@ public:
 		const int chunks_amt = static_cast<int>(std::ceil(float(dataset_input_size) / float(input_dim)));
 		Matrix chunk = Matrix::Zero(input_dim, batch_size); // zero padded
 
+		const auto n_threads = Utilities::eigen_get_num_threads();
 		for (const auto& batch : input.batches(batch_size)) {
 			// Reset the reservoir, setting the initial state to zero. This effectively begins a 
 			// new temporal sequence for the batches. 
 			reset();
 			chunk.setZero();
 			for (int c = 0; c < chunks_amt; ++c) {
-
 				// The last chunk may be incomplete. 
 				const int start = c * input_dim;
 				const int len = std::min(input_dim, dataset_input_size - start);
-
 
 				for (size_t i = 0; i < batch.size(); ++i) {
 					if (len < input_dim)
 						chunk.col(i).setZero();
 					chunk.col(i).head(len) = batch.x_of(i).segment(start, len);
 				}
-
-				feed(chunk);
-				run();
+				run(chunk);
 			}
 
 			for (int i = 0; i < batch.size(); ++i) {

@@ -34,7 +34,7 @@ namespace autograd {
             return apply(eval_data, vec);
         }
 
-        void apply(EvalMap<ScalarType>& eval_data, Eigen::Ref<EigVec<ScalarType>> vec) {
+        void apply(const EvalMap<ScalarType>& eval_data, Eigen::Ref<EigVec<ScalarType>> vec) {
             if (root == nullptr) {
                 throw std::runtime_error("VectorFunction has no root expression");
             }

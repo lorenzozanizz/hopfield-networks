@@ -81,6 +81,7 @@ public:
     void print(std::ostream& os = std::cout) const;
 
 private:
+
     std::unordered_map<std::string, Segment> segments;
 };
 

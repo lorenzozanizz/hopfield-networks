@@ -41,7 +41,7 @@ class RestrictedBoltzmannMachine {
     std::mt19937 rng;
     std::uniform_real_distribution<double> uni;
 
-    std::vector<BoltzmannLogger*> loggers;
+    std::vector<BoltzmannLogger<FloatingType>*> loggers;
 
     // These are to be used as buffers when computing the cd-k algorithm,
     // this avoids the overhead of re-allocating the local fields. 
@@ -74,6 +74,14 @@ public:
         visible.resize(num_vis);
     }
 
+    unsigned int hidden_size() const {
+        return nh;
+    }
+
+    unsigned int visible_size() const {
+        return nv;
+    }
+
     /**
      * @brief A simple calculator class.
      */
@@ -100,6 +108,15 @@ public:
      */
     void seed(unsigned long long seed) {
         rng.seed(seed);
+    }
+
+    void attach_logger(BoltzmannLogger<FloatingType>* logger) {
+        loggers.push_back(logger);
+    }
+
+    void detach_logger(BoltzmannLogger<FloatingType>* logger) {
+        loggers.erase(
+            std::remove(loggers.begin(), loggers.end(), logger), loggers.end());
     }
 
     /**
@@ -143,6 +160,8 @@ public:
         probs = (1.0 / (1.0 + (-visible_local_fields.array() / temperature).exp())).matrix();
 
         if (do_sample)
+            // ------ NOTE: This sampling is safe because eigen never parallelizes this kind of 
+            // operations which are memory bound (as per documentation)
             visible = probs.unaryExpr([this](FloatingType p) {
                 return (this->uni(this->rng) < p) ? FloatingType(1.0) : FloatingType(0);
             });
@@ -175,12 +194,12 @@ public:
         // conditional distributions. This acts on the hidden and state vectors,
         // updating the notify
 
-        notify_on_run_begin();
+        notify_on_run_begin( this->visible );
         for (unsigned int k_it = 0; k_it < k; ++k_it) {
             sample_hidden(this->visible, this->hidden, true, temperature);
             sample_visible(this->visible, this->hidden, (k_it < k-1)? true : activate_final, temperature);
+            notify_on_visible_change(this->visible);
         }
-
         notify_on_run_end();
     }
 
@@ -242,7 +261,6 @@ public:
 
                     auto loss = (batch_visible - logging_batch).norm();
                     prog_bar.print_intermediate("Retrieval loss: " + std::to_string(loss));
-                    notify_loss(loss);
                 }
 
                 // This is the positive phase, DO  Sample the hidden states!
@@ -278,13 +296,6 @@ public:
     /**
      * @brief A simple calculator class.
      */
-    void notify_loss(double loss) {
-
-    }
-
-    /**
-     * @brief A simple calculator class.
-     */
     void map_into_hidden(
         const VectorCollection<Vector>& data_input,
         VectorCollection<Vector>& data_output,
@@ -314,11 +325,11 @@ public:
     /**
      * @brief A simple calculator class.
      */
-    void compute_energy() {
+    double compute_energy() {
         // From Mehlig, p. 67
         energy = -visible.dot(weights * hidden) - visible.dot(b_v) - hidden.dot(b_h);
         // Notify the logging function to visualize the energy. 
-        notify_energy();
+        return energy;
     }
 
     /**
@@ -338,16 +349,6 @@ public:
     /**
      * @brief A simple calculator class.
      */
-    void visualize_learned_kernels(Plotter& p) {
-        // This visualizes the kernel learned by the weights as heatmaps
-        // with the size of the visible layer, this represent patterns to which
-        // "the hidden states are sensible"
-
-    }
-
-    /**
-     * @brief A simple calculator class.
-     */
     void plot_state(Plotter& p, unsigned int width, unsigned int height) {
         auto ctx = p.context();
         ctx.set_title("State").show_heatmap(visible.data(), width, height, "gray");
@@ -357,6 +358,9 @@ public:
      * @brief A simple calculator class.
      */
     void plot_kernel(Plotter& p, unsigned int hidden_index, unsigned int width, unsigned int height) {
+        // This visualizes the kernel learned by the weights as heatmaps
+        // with the size of the visible layer, this represent patterns to which
+        // "the hidden states are sensible"
         auto ctx = p.context();
         ctx.set_title("Kernel").show_heatmap(weights.col(hidden_index).data(), width, height, "gray");
     }
@@ -396,22 +400,22 @@ public:
     /**
      * @brief A simple calculator class.
      */
-    void notify_energy() {
-
+    void notify_on_visible_change(const State& new_state) {
+        for (auto* o : loggers) o->on_visible_change(new_state);
     }
 
     /**
      * @brief A simple calculator class.
      */
     void notify_on_run_end() {
-
+        for (auto* o : loggers) o->on_run_end();
     }
 
     /**
      * @brief A simple calculator class.
      */
-    void notify_on_run_begin() {
-
+    void notify_on_run_begin(const State& initial_state) {
+        for (auto* o : loggers) o->on_run_begin(initial_state);
     }
 
 };

@@ -57,7 +57,7 @@ public:
 	void set_collect_states(bool value /*Note : I think that you are not using this variable in this scope*/,
 		const std::string& into = "states.gif",
 		unsigned int width = 0, unsigned int height = 0) {
-		record_state = true;
+		record_state = value;
 		states_gif_save = into;
         visual_width = width;
         visual_height = height;
