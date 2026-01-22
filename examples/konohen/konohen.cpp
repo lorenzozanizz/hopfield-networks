@@ -85,10 +85,10 @@ int main() {
 	}
 
 	Plotter plotter;
-
+	classifier.plot(plotter);
 	// Let us now visualize the trained weights that the mapping has associated with
 	// the predicted majority label of 4
-	classifier.plot_label_MNIST(plotter, -1);
+	classifier.plot_label_MNIST(plotter, 4);
 
 	// We now explore the ways in which we can exploit our topologically meaningful
 	// mapping to gain informations about the clusters in the original dataset. 

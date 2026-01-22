@@ -158,7 +158,6 @@ public:
 			for (int j = 0; j < num_neurons; ++j) {
 				if (map_neuron_label(x_from_idx(j), y_from_idx(j)) == label) {
 					plotter.context().show_heatmap(trained_map.get_weights(j).data(), 28, 28, "gray");
-					std::cout << x_from_idx(j) << " , " << y_from_idx(j) << "\n";
 				}
 			}
 			plotter.block();

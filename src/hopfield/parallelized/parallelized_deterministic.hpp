@@ -93,7 +93,7 @@ public:
 						MathOps::sgn(local_fields_out[i]) > 0);
 
 				this->notify_state(update_indexes, this->binary_state);
-			}
+			}	
 
 			if (schedule.do_order_parameter)
 				this->compute_order_parameter(it);
