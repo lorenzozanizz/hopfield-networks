@@ -6,6 +6,7 @@
 #include <functional>
 #include <optional>
 #include <random>
+#include <omp.h>
 
 // To collect and plot information about the loss functions
 #include "../io/plot/plot.hpp"
@@ -16,6 +17,9 @@
 #include "../math/autograd/variables.hpp"
 #include "../math/autograd/functions.hpp"
 #include "../math/matrix/matrix_ops.hpp"
+
+// To debug
+#include "../utils/timing.hpp"
 
 
 /**
@@ -164,8 +168,8 @@ public:
         // Forward pass: X is (input_dim × batch_size)
         for (int l = 1; l < num_layers; ++l) {
             // Z[l] = W[l] * A[l-1] + b[l] (broadcasted with eigen)
-            Z[l] = (W[l] * A[l - 1]).colwise() + b[l];
-            A[l] = act_functions[l - 1].f(Z[l]);
+            Z[l].noalias() = (W[l] * A[l - 1]).colwise() + b[l];
+            A[l].noalias() = act_functions[l - 1].f(Z[l]);
         }
         return A[num_layers - 1];
     }
@@ -190,22 +194,21 @@ public:
     void backward(const Matrix& dLoss_dA_L) {
         int batch_size = dLoss_dA_L.cols();
 
-
         // Output layer delta
         delta[num_layers - 1] =
             dLoss_dA_L.cwiseProduct(act_functions[num_layers - 2].df(Z[num_layers - 1]));
 
         // Hidden layers
         for (int l = num_layers - 2; l >= 1; --l) {
-            delta[l] =
+            delta[l].noalias() =
                 (W[l + 1].transpose() * delta[l + 1])
                 .cwiseProduct(act_functions[l - 1].df(Z[l]));
         }
 
         // Gradients
         for (int l = 1; l < num_layers; ++l) {
-            dW[l] = (delta[l] * A[l - 1].transpose()) / batch_size;
-            db[l] = delta[l].rowwise().mean();
+            dW[l].noalias() = (delta[l] * A[l - 1].transpose()) / batch_size;
+            db[l].noalias() = delta[l].rowwise().mean();
         }
 
     }
@@ -333,7 +336,8 @@ public:
         // An optional verification dataset
         std::optional< std::reference_wrapper<Dataset> > verification_data,
         unsigned int batch_size,
-        double lr
+        double lr,
+        bool print_timings = true
     ) {
         // Avoid something fancy like a generator expression for the 
         // datasets to avoiding the handling of too much data at once, even though
@@ -349,18 +353,31 @@ public:
         Matrix batch_gradient(network.output_size(), batch_size);
         Matrix batch_output(network.output_size(), batch_size);
 
+        MultiProgressBar progress(epochs);
+        SegmentTimer timer;
+
         for (unsigned int epoch = 0; epoch < epochs; ++epoch)
         {
+            if (print_timings)
+                progress.update(epoch);
             data.shuffle();
             // For each epoch perform the following train iteration. 
             for (auto batch : data.batches(batch_size)) {
                 // First we build the batched input matrix (Note that the i iterations are
                 // batch local indices, not global indices!)
+                timer.start("data transfer");
                 for (size_t i = 0; i < batch.size(); ++i) {
                     batch_input.col(i) = batch.x_of(i);
                 }
+                timer.stop("data transfer");
+
+                // Forward propagate the data onto the network. 
+                timer.start("forward");
                 batch_output = network.forward(batch_input);
+                timer.stop("forward");
+
                 // Then we construct the batched gradient matrix
+                timer.start("gradient");
                 for (size_t i = 0; i < batch.size(); ++i) {
                     VectorType out_col = batch_output.col(i);
                     VectorType true_col = batch.y_of(i);
@@ -370,11 +387,17 @@ public:
                     loss_eval_map.emplace(ground_truth_variable, true_col);
                     gradient_generator(loss_eval_map, batch_gradient.col(i));
                 }
-                // We then perform backpropagation 
-                network.backward(batch_gradient);
+                timer.stop("gradient");
 
+                // We then perform backpropagation 
+                timer.start("backprop");
+                network.backward(batch_gradient);
+                timer.stop("backprop");
                 // And apply the gradient (averaged, so no lr/batch)
+
+                timer.start("apply");
                 network.apply_gradients( lr );
+                timer.stop("apply");
             }
             // These are logging routines to aid with training
 
@@ -385,22 +408,24 @@ public:
                 notify_verification_loss( compute_loss_over_dataset( *verification_data , batch_size ) );
             }
         }
-
-        network.apply_gradients(lr);
+        if (print_timings)
+            timer.print();
     }
 
     /**
      * @brief A simple calculator class.
      */
     void notify_loss(double loss) {
-
+        if (record_loss)
+            nvc.append_for("Loss", loss);
     }
 
     /**
      * @brief A simple calculator class.
      */
     void notify_verification_loss(double loss) {
-
+        if (record_verif_loss)
+            nvc.append_for("Verification loss", loss);
     }
 
     /**
@@ -426,7 +451,13 @@ public:
      */
     void plot_loss(Plotter& plotter) {
         if (record_loss || record_verif_loss) {
-
+            for (const auto& pair : nvc) {
+                if (!pair.second.size())
+                    continue;
+                auto ctx = plotter.context();
+                ctx.set_title("Evolution of " + pair.first).
+                    set_x_label("Epoch").plot_sequence(pair.second);
+            }
         }
     }
 

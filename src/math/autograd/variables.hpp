@@ -683,7 +683,7 @@ namespace autograd {
     EigVec<ScalarType> eval_node(
         ExpressionNode* root,
         std::vector<ExpressionNode*>& eval_ordering,
-        EvalMap<ScalarType>& eval_data,
+        const EvalMap<ScalarType>& eval_data,
         EvalCache<ScalarType>& cache
     ) {
        // Surely this will not evaluate to a matrix under normal circumstances.

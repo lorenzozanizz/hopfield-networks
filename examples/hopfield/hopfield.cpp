@@ -112,7 +112,7 @@ int main() {
 	std::cout << "> Feeding the pattern to the network: " << std::endl;
 	dhn.feed(deformed_5);
 	std::cout << "> Running the deterministic network: " << std::endl;
-	// dhn.run(/* Iterations */ 200, uc);
+	dhn.run(/* Iterations */ 200, uc);
 	// Implicit plotting... because of the logger settings. 
 
 	// The logger has generated a gif representing the transition of denoised states over
@@ -134,13 +134,13 @@ int main() {
 	std::unique_ptr<AnnealingScheduler> temp_sched = std::make_unique<LinearScheduler>(2.0, 1.0, /* iterations */ 200);
 	shn.run( /* Iterations */ 200, temp_sched, uc);
 	
-	// p.block();
+	p.wait();
 
 	// Create the classifier object to see how the patterns can be classified by representatives
 	// after feeding the values. 
-	constexpr const auto num_examples_classify = 200;
+	constexpr const auto num_examples_classify = 2000;
 	VectorDataset<std::vector<unsigned char>, unsigned int> mnist_sample(num_examples_classify);
-	DatasetRepo::load_mnist_vector("vector_mnist.data", num_examples_classify, mnist_sample);
+	DatasetRepo::load_mnist_vector("vector_mnist_full.data", num_examples_classify, mnist_sample);
 
 	std::cout << "> Constructing the classifier: " << std::endl;
 	HopfieldClassifier classifier;

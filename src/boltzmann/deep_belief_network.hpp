@@ -3,6 +3,7 @@
 #define DEEP_BELIEF_HPP
 
 #include <vector>
+#include <random>
 #include <functional>
 #include <map>
 
@@ -74,6 +75,8 @@ public:
 			// See the note above this function to see why we do it like this. 
 		}
 
+		std::random_device rdev;
+		std::mt19937 rgen(rdev());
 		// Now plot just the required kernels. 
 		for (unsigned int layer = from; layer <= to; ++layer) {
 			
@@ -82,9 +85,11 @@ public:
 
 			// Get the amount of kernels to plot... 
 			const auto amount = how_many_per_layer[layer-from];
-			for (int i = 0; i < amount; ++i)
-				kernel_mappings.push_back(layer_mappings[layer].col(i).data());
-
+			std::uniform_int_distribution<int> idist(0, machines_stack[layer].get().hidden_size() - 1);
+			for (int i = 0; i < amount; ++i) {
+				// Pick a random weight: 
+				kernel_mappings.push_back(layer_mappings[layer].col(idist(rgen)).data());
+			}
 			plotter.context()
 				.plot_multiple_heatmaps(kernel_mappings, plot_width, plot_height, width, height,
 					"Kernels of machine of order " + std::to_string(layer));

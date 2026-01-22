@@ -7,6 +7,8 @@
 #include <iostream>
 #include <vector>
 
+#include "matrix/matrix_ops.hpp"
+
 namespace Utilities {
 
 	template <typename DataType = float>

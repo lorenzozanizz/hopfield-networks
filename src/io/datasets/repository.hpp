@@ -240,7 +240,8 @@ namespace DatasetRepo {
 	void load_mit_bih(
 		const std::string& path,
 		unsigned int amount,
-		VectorDataset<FloatVector<FloatingType>, FloatVector<FloatingType>>& entries) {
+		VectorDataset<FloatVector<FloatingType>, FloatVector<FloatingType>>& entries,
+		unsigned int offset = 0) {
 		// Load the CV, compute the one-hot representation of classes. 
 		// See the Keggle page 
 		// https://www.kaggle.com/datasets/josegarciamayen/mit-bih-arrhythmia-dataset-preprocessed?resource=download
@@ -260,6 +261,11 @@ namespace DatasetRepo {
 
 		// Read the header line once
 		std::getline(file, line);
+
+		// Skip over offset lines of the csv. 
+		if (offset)
+			for (int i = 0; i < offset; ++i)
+				std::getline(file, line);
 		while (std::getline(file, line)) {
 			if (line.empty() || line.rfind("#", 0) == 0) continue;
 
