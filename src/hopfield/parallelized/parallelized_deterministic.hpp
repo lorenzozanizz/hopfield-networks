@@ -23,9 +23,8 @@ public:
 	void run(
 		unsigned int num_threads,
 		const unsigned long iterations,
-		const UpdateConfig uc,
+		const UpdateConfig uc
 		// ^Describe whether we have asyncronous, synchronous or group updates.
-		const BinaryState& ref_state
 	) {
 
 		// A note for the following: All IO operations need to be operated in 
@@ -94,10 +93,6 @@ public:
 						MathOps::sgn(local_fields_out[i]) > 0);
 
 				this->notify_state(update_indexes, this->binary_state);
-			}
-
-			if (this->binary_state.agreement_score(ref_state) > 0.95) {
-				break;
 			}
 
 			if (schedule.do_order_parameter)
