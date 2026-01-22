@@ -23,8 +23,9 @@ public:
 	void run(
 		unsigned int num_threads,
 		const unsigned long iterations,
-		const UpdateConfig uc
+		const UpdateConfig uc,
 		// ^Describe whether we have asyncronous, synchronous or group updates.
+		const BinaryState& ref_state
 	) {
 
 		// A note for the following: All IO operations need to be operated in 
@@ -67,7 +68,6 @@ public:
 				// by setting the number of threads earlier!
 				this->policy.synch_update(this->binary_state, this->local_fields);
 				// Here we parallelize on our own: 
-				#pragma omp parallel for num_threads(num_threads)
 				for (int i = 0; i < this->network_size; ++i)
 					this->binary_state.set_value(i, MathOps::sgn(this->local_fields[i]) > 0);
 
@@ -78,20 +78,26 @@ public:
 				NetUtils::random_subset(update_indexes, this->network_size, uc.group_size);
 				this->policy.hint_state(this->binary_state);
 
-				#pragma omp parallel for num_threads(num_threads)
-				for (int i = 0; i < num_threads; ++i) {
-					local_fields_out[i] = this->policy.compute_local_field(
-						this->binary_state,
-						update_indexes[i], false
-					);
+				#pragma omp parallel num_threads(num_threads)
+				{
+					#pragma omp parallel for
+					for (int i = 0; i < num_threads; ++i) {
+						local_fields_out[i] = this->policy.compute_local_field(
+							this->binary_state,
+							update_indexes[i], false
+						);
+					}
 				}
 
-				#pragma omp parallel for num_threads(num_threads)
 				for (int i = 0; i < uc.group_size; ++i)
 					this->binary_state.set_value(update_indexes[i],
 						MathOps::sgn(local_fields_out[i]) > 0);
 
 				this->notify_state(update_indexes, this->binary_state);
+			}
+
+			if (this->binary_state.agreement_score(ref_state) > 0.95) {
+				break;
 			}
 
 			if (schedule.do_order_parameter)

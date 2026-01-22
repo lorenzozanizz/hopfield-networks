@@ -145,7 +145,6 @@ public:
 					);
 				}
 
-				#pragma omp parallel for num_threads(num_threads)
 				for (int i = 0; i < uc.group_size; ++i)
 					this->binary_state.set_value(update_indexes[i],
 						compute_value(local_fields_out[i], temp_sched->get_temp() ));
