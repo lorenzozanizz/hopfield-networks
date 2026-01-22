@@ -1,4 +1,6 @@
 #include <vector>
+#include <iostream>
+#include <chrono>
 
 // -------------- INPUT ROUTINES --------------
 #include "math/matrix/matrix_ops.hpp"
@@ -7,9 +9,6 @@
 // -------------- PLOTTING --------------
 #include "io/plot/plot.hpp"
 #include "utils/timing.hpp"
-#include <Eigen/Dense>
-#include <iostream>
-#include <chrono>
 
 using Clock = std::chrono::high_resolution_clock;
 

@@ -59,7 +59,8 @@ add_executable(plot "examples/plot_wrapper/plot.cpp")
 add_executable(konohen "examples/konohen/konohen.cpp")
 add_executable(reservoir "examples/reservoir/reservoir.cpp")
 add_executable(blastest "examples/blas/blas.cpp")
-    
+add_executable(mlp "examples/mlp/mlp.cpp")
+
 add_library(example_common INTERFACE)
 
 target_compile_options(example_common INTERFACE
@@ -82,6 +83,7 @@ target_link_libraries(example_common
 target_link_libraries(blastest PRIVATE example_common)
 target_link_libraries(hopfield PRIVATE example_common)
 target_link_libraries(reservoir PRIVATE example_common)
+target_link_libraries(mlp PRIVATE example_common)
 target_link_libraries(konohen PRIVATE example_common)
 target_link_libraries(boltzmann PRIVATE example_common)
 target_link_libraries(plot PRIVATE example_common)

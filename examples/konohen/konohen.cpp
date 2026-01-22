@@ -99,7 +99,7 @@ int main() {
 	// We present three such possible approaches: two variations of the classical U-Matrix
 	// method, and k-means clustering performed on the unit weights. 
 	Cluster<double> distance_u_matrix(km);
-	KMeans kmeans_on_units(10, /* Iterations */ 50);
+	KMeans<double> kmeans_on_units(10, /* Iterations */ 50);
 	UClusteringEigen<double> u_clustering(km);
 
 	distance_u_matrix.compute();

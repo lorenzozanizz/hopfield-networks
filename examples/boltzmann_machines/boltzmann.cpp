@@ -51,8 +51,6 @@ int main() {
 	// on the running hardware
 	Utilities::eigen_init_parallel(-1);
 
-	Utilities::eigen_init_parallel(-1);
-
 	Eigen::setNbThreads(6);
 	std::cout << "> Processing with " << Utilities::eigen_get_num_threads() << " threads on Eigen";
 	SegmentTimer timer;

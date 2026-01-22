@@ -19,5 +19,7 @@ std::tuple<BinaryState, HopfieldClassifier::Category>* HopfieldClassifier::class
 			max_pair = &pair;
 		}
 	}
-	return max_pair;
+	if (max_seen_agreement > threshold)
+		return max_pair;
+	return nullptr;
 }

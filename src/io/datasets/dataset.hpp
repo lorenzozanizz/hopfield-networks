@@ -4,6 +4,7 @@
 
 #include <tuple>
 #include <vector>
+#include <memory>
 #include <functional>
 #include <algorithm>
 #include <random>

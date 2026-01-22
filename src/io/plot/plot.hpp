@@ -138,8 +138,17 @@ public:
 		}
 
 		template <typename YType>
-		PlottingContext& plot_sequence(const std::vector<YType>& ys) {
-			pipe.send_line("plot '-' using 0:1 with lines");
+		PlottingContext& plot_sequence(const std::vector<YType>& ys, const std::string& title = "Line") {
+			pipe.send_line("plot '-' using 0:1 with lines title '" + title + "'");
+			for (int i = 0; i < ys.size(); ++i)
+				pipe.send_line(std::to_string(ys[i]));
+			pipe.send_line("e");
+			return *this;
+		}
+
+		template <typename Indexable>
+		PlottingContext& plot_indexable(const Indexable& ys, const std::string& title = "Line") {
+			pipe.send_line("plot '-' using 0:1 with lines title '" + title + "'");
 			for (int i = 0; i < ys.size(); ++i)
 				pipe.send_line(std::to_string(ys[i]));
 			pipe.send_line("e");
@@ -352,10 +361,6 @@ public:
 		pipe.send_line("set term " + terminal);
 	}
 
-	void read_gp_file(const std::string) {
-
-	}
-
 	~Plotter() {
 		// We do not close explicitly the pipe in this version to avoid
 		// double freeing
@@ -396,13 +401,6 @@ protected:
 		for (int i = 1; i < this->plot_id; ++i) {
 			this->pipe.send_line("set terminal wxt " + std::to_string(i) + " close");
 		}
-	}
-
-
-	// Utility function to write the stream of data in the gnuplot
-	// pipe
-	void write_x_y_pairs() {
-
 	}
 
 }; // ! class Plotter

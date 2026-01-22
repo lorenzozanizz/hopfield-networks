@@ -210,14 +210,16 @@ namespace DatasetRepo {
 	template <typename FloatingType>
 	void load_sine_time_series(
 		unsigned int amount,
-		VectorDataset<FloatVector<FloatingType>, FloatVector<FloatingType>>& entries
+		VectorDataset<FloatVector<FloatingType>, FloatVector<FloatingType>>& entries,
+		unsigned int output_size = 10,
+		unsigned int offset = 0
 	) {
 
 		if (amount <= 0)
 			throw std::runtime_error("Illegal size for dataset");
 
 		constexpr const auto in_size = 30;
-		constexpr const auto out_size = 10;
+		const auto out_size = output_size;
 
 		FloatVector<FloatingType> in_vector(in_size);
 		FloatVector<FloatingType> out_vector(out_size);
@@ -227,9 +229,9 @@ namespace DatasetRepo {
 		for (unsigned int i = 0; i < amount; ++i) {
 
 			for (int j = 0; j < in_size; ++j)
-				in_vector(j) = std::sin(i + dt * j);
+				in_vector(j) = std::sin(offset + i + dt * j);
 			for (int j = 0; j < out_size; ++j)
-				out_vector(j) = std::sin(i + (dt * (j + in_size) ));
+				out_vector(j) = std::sin(offset + i + (dt * (j + in_size) ));
 
 			entries.add_sample(in_vector, out_vector, /* id */i);
 		}

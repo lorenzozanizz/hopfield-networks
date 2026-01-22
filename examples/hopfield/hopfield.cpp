@@ -134,7 +134,7 @@ int main() {
 	std::unique_ptr<AnnealingScheduler> temp_sched = std::make_unique<LinearScheduler>(2.0, 1.0, /* iterations */ 200);
 	shn.run( /* Iterations */ 200, temp_sched, uc);
 	
-	p.wait();
+	p.block();
 
 	// Create the classifier object to see how the patterns can be classified by representatives
 	// after feeding the values. 
@@ -146,6 +146,9 @@ int main() {
 	HopfieldClassifier classifier;
 	for (int i = 0; i < 10; ++i)
 		classifier.put_mapping(binary_states[i], i);
+
+	// Reject a reconstructed pattern if the agreement is lower than this threshold
+	classifier.set_confidence_threshold(0.7);
 
 	dhn.attach_classifier(&classifier);
 

@@ -17,7 +17,6 @@
 #include "io/plot/plot.hpp"
 #include "utils/timing.hpp"
 
-
 int main() {
 
 	using namespace Eigen;
@@ -151,7 +150,7 @@ int main() {
 	trainer.do_log_loss(true);
 	trainer.do_log_verification_loss(true);
 
-	std::cout << "> Initial loss: " << trainer.compute_loss_over_dataset(ecg_embedded_repr, BATCH_SIZE) << std::endl;
+	std::cout << "> Initial verification loss: " << trainer.compute_loss_over_dataset(verification_ecg_embedded_repr, BATCH_SIZE) << std::endl;
 
 	trainer.train(
 		80,
@@ -164,6 +163,6 @@ int main() {
 	trainer.plot_loss(p);	
 	p.block();
 
-	std::cout << "Final loss: " << trainer.compute_loss_over_dataset(ecg_embedded_repr, BATCH_SIZE) << std::endl;
+	std::cout << "Final verification loss: " << trainer.compute_loss_over_dataset(verification_ecg_embedded_repr, BATCH_SIZE) << std::endl;
 
 }
