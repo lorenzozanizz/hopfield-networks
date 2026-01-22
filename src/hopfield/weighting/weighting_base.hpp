@@ -19,6 +19,8 @@ protected:
 	unsigned int memorized_amt;
 
 public:
+
+	WeightingPolicy() : memorized_amt(0) {}
 	// Make the datatype attribute public for type declarations around the
 	// code. 
 	using Type = DataType;
@@ -70,7 +72,7 @@ protected:
 
 public:
 
-	DensePolicy(state_size_t size) : net_size(size),
+	DensePolicy(state_size_t size) : WeightingPolicy<DataType>(), net_size(size),
 		weights()
 		// Do not allocate yet the weights to allow finegrained control.
 	{ }
@@ -217,7 +219,7 @@ class MatrixFreePolicy: public WeightingPolicy<DataType>{
 
 public:
 
-	MatrixFreePolicy(state_size_t size) : net_size(size)
+	MatrixFreePolicy(state_size_t size) : WeightingPolicy<DataType>(), net_size(size)
 		// Do not allocate yet the weights to allow finegrained control.
 	{ }
 
@@ -236,7 +238,6 @@ public:
 	virtual void store(BinaryState& bs) override {
 		images.push_back(std::reference_wrapper<BinaryState>(bs));
 		this->memorized_amt++;
-
 		return;
 	}
 
@@ -273,8 +274,10 @@ public:
 		if (i == j)
 			return 0.0;
 		const DataType one_over_n = DataType(1) / this->net_size;
-		for (int state = 0; state < this->memorized_amt++; ++state) {
+
+		for (int state = 0; state < this->memorized_amt; ++state) {
 			auto& bs = images[state].get();
+
 			if (bs.get(i) && bs.get(j) || (!bs.get(i) && !bs.get(j)))
 				online_weight += one_over_n;
 			else online_weight -= one_over_n;

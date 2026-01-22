@@ -7,10 +7,10 @@
 
 #include "../states/binary.hpp"
 
-
-// This class functions as an attachable component to the main hopfield network,
-// acts as a selector repositories between a set of known mappings state->categories.
-
+/**
+* @brief This class functions as an attachable component to the main hopfield network,
+* acts as a selector repositories between a set of known mappings state->categories.
+*/
 class HopfieldClassifier {
 	// Assume for simplicity that the labels are positve integers, as the
 	// majority of cases. 

@@ -202,6 +202,10 @@ public:
 			for (int plot_i = 0; plot_i < plot_height; ++plot_i)
 				for (int plot_j = 0; plot_j < plot_width; ++plot_j) {
 					
+					if (plot_i * plot_width + plot_j >= buffers.size()) {
+						pipe.send_line("unset multiplot");
+						return *this;
+					}
 					auto& buffer = buffers[plot_i * plot_width + plot_j];
 
 					pipe.send_line("splot '-' matrix with image");
@@ -213,7 +217,6 @@ public:
 								fprintf(raw_pipe, "%f ", buffer[i * width + j]);
 						fprintf(raw_pipe, "\n");
 					}
-					fprintf(raw_pipe, "\n");
 					pipe.send_line("e");
 				}
 			pipe.send_line("unset multiplot");

@@ -118,18 +118,22 @@ public:
         record_energy = v;
         if (v)
             interested_in.push_back(Event::EnergyChanged);
+
+        else interested_in.erase(std::remove(interested_in.begin(), interested_in.end(), Event::EnergyChanged), interested_in.end());
     }
     
     void set_collect_temperature(bool v) {
         record_temperature = v; 
         if (v)
             interested_in.push_back(Event::TemperatureChanged);
+        else interested_in.erase(std::remove(interested_in.begin(), interested_in.end(), Event::TemperatureChanged), interested_in.end());
     }
 
     void set_collect_order_parameter(bool v) {
         record_order = v; 
         if (v)
             interested_in.push_back(Event::OrderParameterChanged);
+        else interested_in.erase(std::remove(interested_in.begin(), interested_in.end(), Event::OrderParameterChanged), interested_in.end());
     }
 
     bool is_interested_in(const Event evt) {

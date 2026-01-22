@@ -8,6 +8,11 @@
 #include "../io/plot/plot.hpp"
 #include "../io/gif/gif.hpp"
 
+/**
+ * @brief A simple logger class for restricted boltzmann machines which allow the 
+ * capture of the state of the network over time. This module, like other loggers,
+ * make extensive use of the IO routines. 
+ */
 template <typename FloatingType>
 class BoltzmannLogger {
 
@@ -41,8 +46,13 @@ public:
 
 	BoltzmannLogger() : record_visible(false) { }
 
-	// Note: this sets the requirement to save the states collected in the selected .gif
-	void set_collect_states(bool value /*Note : I think that you are not using this variable in this scope*/,
+	/**
+	 * @brief Set the record_visible internal boolean which, if enabled, lets the logger
+	 * record the states of the boltzman network over time. 
+	 * 
+	 * Note: this sets the requirement to save the states collected in the selected .gif
+	 */
+	void set_collect_states(bool value,
 		const std::string& into = "states.gif",
 		unsigned int width = 0, unsigned int height = 0) {
 		record_visible = value;
@@ -51,6 +61,10 @@ public:
 		visual_height = height;
 	}
 
+	/**
+	 * @brief A callback for the beginning of the run, like other logs this initializes the
+	 * internal buffer the the right size
+	 */
 	void on_run_begin(const State& begin_state) {
 		if (record_visible) {
 			if (states_gif_save.empty())
@@ -67,6 +81,9 @@ public:
 		}
 	}
 
+	/**
+	 * @brief A callback for the change event of the visible state of the boltzmann network
+	 */
 	void on_visible_change(const State& new_state) {
 		if (record_visible) {
 			if (!log_buf.write_buffer)
@@ -76,6 +93,10 @@ public:
 		}
 	}
 
+	/**
+	 * @brief A callback for end of the run which may write the resulting PNG if state
+	 * collection was enabled during a run
+	 */
 	void on_run_end() {
 		if (record_visible) {
 			// Close the gif stream to finalize the gif file. Assume that the last alteration to
@@ -90,6 +111,11 @@ public:
 
 protected:
 
+
+	/**
+	 * @brief Writes the internal buffer that keeps the JPG raw data to be used
+	 * for writing the gif the logger maintains over time. 
+	 */
 	void update_logger_buffer(const State& bs, bool reset = false,
 		unsigned int low_value = 0, unsigned int high_val = 255) {
 		// Ensure the buffer is initialized properly. The values for the strides are to be

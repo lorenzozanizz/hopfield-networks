@@ -18,7 +18,10 @@
 #include "boltzmann_logger.hpp"
 
 /**
- * @brief A simple calculator class.
+ * @brief A class representing a collection of RBMs stacked on top of eachother.
+ * Only references to the RBMs are kept, claiming no ownership. This class allows
+ * for joint unsupervised training and visualization of the weights as the network
+ * dept increases. 
  */
 template <typename FloatingType>
 class StackedRBM {
@@ -37,6 +40,20 @@ public:
 	StackedRBM(std::vector<std::reference_wrapper<
 		RestrictedBoltzmannMachine<FloatingType>>> stack): machines_stack(stack) { }
 
+	/**
+	 * @brief This function allows the user to visualize the kernels in hierarchically
+	 * upper layers of the RBM by considering recursive weighted sum os the lower kernels, 
+	 * which is mapped as a matrix multiplication
+	 * 
+	 * @param plotter the plotter class
+	 * @param plot_width the width in number of kernels for the multiplot
+	 * @param plot_height the height in number of kernels for the multiplot
+	 * @param width the width of each image
+	 * @param height the height of each image
+	 * @param how_many_per_layer how many kernels to plot per layer
+	 * @param from the initial layer
+	 * @param to the final layer
+	 */
 	void visualize_kernels_depthwise(
 		Plotter& plotter, 
 		unsigned int plot_width, 
@@ -85,7 +102,7 @@ public:
 
 			// Get the amount of kernels to plot... 
 			const auto amount = how_many_per_layer[layer-from];
-			std::uniform_int_distribution<int> idist(0, machines_stack[layer].get().hidden_size() - 1);
+			std::uniform_int_distribution<int> idist(0, machines_stack[layer].get().hidden_size() - 2);
 			for (int i = 0; i < amount; ++i) {
 				// Pick a random weight: 
 				kernel_mappings.push_back(layer_mappings[layer].col(idist(rgen)).data());
@@ -97,6 +114,17 @@ public:
 
 	}
 
+	/**
+	 * @brief Trains greedy layer-wise the RBM stack through CD-k using the hidden states of the
+	 * previous layers as dataset.
+	 * 
+	 * @param epochs Number of epochs to train each layer
+	 * @param data the dataset
+	 * @param batch_size the batch size for the dataset iteration
+	 * @param lr The learning rate
+	 * @param k the CD-k parameter 
+	 * @param decay A weight decay coefficient
+	 */
 	void unsupervised_train(
 		int epochs,
 		VectorCollection<Vector>& data,

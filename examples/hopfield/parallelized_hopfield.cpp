@@ -29,7 +29,7 @@ int main() {
 	constexpr const auto MNIST_SIZE = 28;
 
 	ParallelDenseHopfieldNetwork<Hebbs>				dhn(MNIST_SIZE * MNIST_SIZE);
-	ParallelStochasticHopfieldNetwork<Free>			shn(MNIST_SIZE * MNIST_SIZE);
+	ParallelStochasticHopfieldNetwork<Hebbs>		shn(MNIST_SIZE * MNIST_SIZE);
 
 	VectorDataset<std::vector<unsigned char>, unsigned int> ten_representatives(10);
 	// Load ten representatives for the ten classes of hopfield networks. 
@@ -111,6 +111,10 @@ int main() {
 
 	// Now attach the logger to the stochastich hopfield network and see how it behaves.
 	shn.attach_logger(&logger); {
+
+		// Cannot use energy functions for matrix free weighing policy!
+		logger.set_collect_energy(false);
+
 		logger.set_collect_states(true, "stochastic_states.gif");
 		logger.finally_write_last_state_png(true, "stochastic_last_state.png");
 		logger.set_prefix("Stochastic network | ");

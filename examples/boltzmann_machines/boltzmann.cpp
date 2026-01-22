@@ -23,7 +23,7 @@ int main() {
 	Plotter p;
 
 	constexpr const auto MNIST_SIZE = 28;
-	constexpr const auto dataset_size = 9000;
+	constexpr const auto dataset_size = 10000;
 
 	Machine machine_0(MNIST_SIZE * MNIST_SIZE, 529 /* 23 * 23 */);
 	Machine machine_1(529, 361 /* 19 * 19 */);
@@ -59,14 +59,14 @@ int main() {
 		dbf.unsupervised_train(
 			/* Number of iterations */ 40,
 			dataset,
-			/* Mini batch size */ 300,
+			/* Mini batch size */ 250,
 			/* Learning rate */ 0.02,
 			/* K parameter for CD-K divergence algo */ 13
 		);
 	}
 	timer.print();
 
-	std::vector<unsigned int> num_kernels_to_plot = { 9, 9, 9 };
+	std::vector<unsigned int> num_kernels_to_plot = { 9, 9, 9};
 
 	dbf.visualize_kernels_depthwise(
 		p, 3, 3, MNIST_SIZE, MNIST_SIZE, num_kernels_to_plot

@@ -45,13 +45,13 @@ target_include_directories(executables PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(executables PRIVATE Eigen3::Eigen)
 target_link_libraries(executables PRIVATE OpenMP::OpenMP_CXX)
 
-add_executable(main "src/main.cpp")
+# add_executable(main "src/main.cpp")
 
 # Link all the executables for the application. 
-target_link_libraries(main PRIVATE executables)
+# target_link_libraries(main PRIVATE executables)
 
-target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(main PRIVATE Eigen3::Eigen)
+# target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
+# target_link_libraries(main PRIVATE Eigen3::Eigen)
 
 add_executable(hopfield "examples/hopfield/hopfield.cpp")
 add_executable(parallelized_hopfield "examples/hopfield/parallelized_hopfield.cpp")

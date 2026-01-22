@@ -56,9 +56,6 @@ public:
         Visible
     };
 
-    /**
-     * @brief A simple calculator class.
-     */
     RestrictedBoltzmannMachine(int num_vis, int num_hidden)
         : nv(num_vis), nh(num_hidden), rng(std::random_device{ }()),
         uni(0.0, 1.0) {
@@ -83,7 +80,7 @@ public:
     }
 
     /**
-     * @brief A simple calculator class.
+     * @brief Resize the size of the internal local fields to fit the input batch size
      */
     void resize_local_fields(unsigned int batch_size) {
         hidden_local_fields.resize(nh, batch_size);
@@ -91,7 +88,7 @@ public:
     }
 
     /**
-     * @brief A simple calculator class.
+     * @brief Initializes the weight to be small normally distributed
      */
     void initialize_weights(double std) {
         // Randomly initializes the weights. 
@@ -119,9 +116,7 @@ public:
             std::remove(loggers.begin(), loggers.end(), logger), loggers.end());
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
+
     template <typename AggregateType>
     // sample hidden from visible
     void sample_hidden(const AggregateType& visible, AggregateType& hidden, bool do_sample, 
@@ -143,9 +138,6 @@ public:
         return;
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     template <typename AggregateType>
     // Sample visible units from the hidden units using the 
     // conditional probability p( v | h = s_h ), as described in 
@@ -170,25 +162,17 @@ public:
         return;
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
+
     void clamp_visible(const State& state) {
         // Feed a pattern in the network. 
         visible = state;
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void random_visible(double prob_on = 0.5) {
         for (int i = 0; i < nv; ++i)
             visible(i) = (uni(rng) < prob_on) ? 1.0 : 0;
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void run_cd_k(unsigned int k, bool activate_final = false, double temperature = 1.0) {
         // Run the update on the network for k times, using the marginal
         // conditional distributions. This acts on the hidden and state vectors,
@@ -211,9 +195,6 @@ public:
     // CD-k training on a collection of vectorial inputs, WE DO NOT store
     // images as binary states anymore as in hopfield because the computations
     // are much much heavier. We batch the training, unlike Mehlig
-    /**
-     * @brief A simple calculator class.
-     */
     void train_cd(
         int epochs,
         VectorCollection<Vector>& data,
@@ -293,9 +274,6 @@ public:
         }
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void map_into_hidden(
         const VectorCollection<Vector>& data_input,
         VectorCollection<Vector>& data_output,
@@ -322,9 +300,6 @@ public:
 
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     double compute_energy() {
         // From Mehlig, p. 67
         energy = -visible.dot(weights * hidden) - visible.dot(b_v) - hidden.dot(b_h);
@@ -332,31 +307,19 @@ public:
         return energy;
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void dump_weights(const std::string into) {
         MathOps::save_matrix_binary(into, weights);
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void load_weights(const std::string from) {
         MathOps::load_matrix_binary(from, weights);
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void plot_state(Plotter& p, unsigned int width, unsigned int height) {
         auto ctx = p.context();
         ctx.set_title("State").show_heatmap(visible.data(), width, height, "gray");
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void plot_kernel(Plotter& p, unsigned int hidden_index, unsigned int width, unsigned int height) {
         // This visualizes the kernel learned by the weights as heatmaps
         // with the size of the visible layer, this represent patterns to which
@@ -365,9 +328,6 @@ public:
         ctx.set_title("Kernel").show_heatmap(weights.col(hidden_index).data(), width, height, "gray");
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void plot_higher_order_kernel(Plotter& p, unsigned int hidden_index, unsigned int width,
         unsigned int height, RestrictedBoltzmannMachine<FloatingType>& machine) {
         // Use this as a weighted linear combination of the kernels of the lower order machine
@@ -382,9 +342,6 @@ public:
         ctx.set_title("Higher Kernel").show_heatmap(weighted_sum.data(), width, height, "gray");
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void compute_higher_order_kernels( Matrix& lower_semantic_weights, Matrix& out_location ) {
         // This function computes the higher order kernels for an upper layer in a DBN,
         // extending the above procedure to a matrix .
@@ -397,23 +354,13 @@ public:
 
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void notify_on_visible_change(const State& new_state) {
         for (auto* o : loggers) o->on_visible_change(new_state);
     }
-
-    /**
-     * @brief A simple calculator class.
-     */
     void notify_on_run_end() {
         for (auto* o : loggers) o->on_run_end();
     }
 
-    /**
-     * @brief A simple calculator class.
-     */
     void notify_on_run_begin(const State& initial_state) {
         for (auto* o : loggers) o->on_run_begin(initial_state);
     }

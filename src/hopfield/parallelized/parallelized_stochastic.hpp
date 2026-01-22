@@ -106,7 +106,6 @@ public:
 			throw std::runtime_error("The network cant compute the order parameters because no "
 				"reference states were specified!");
 
-
 		// We ensure by contract that this function will end with the same number of threads: 
 		// this value will be written beck when we're done!
 		unsigned int previous_num_threads = Utilities::eigen_get_num_threads();
@@ -125,7 +124,6 @@ public:
 				// by setting the number of threads earlier!
 				this->policy.synch_update(this->binary_state, this->local_fields);
 				// Here we parallelize on our own: 
-				#pragma omp parallel for num_threads(num_threads)
 				for (int i = 0; i < this->network_size; ++i)
 					this->binary_state.set_value(i, compute_value(
 						this->local_fields[i], temp_sched->get_temp()));
@@ -136,15 +134,16 @@ public:
 				// Stochastically select a subset of the units, then run
 				NetUtils::random_subset(update_indexes, this->network_size, uc.group_size);
 				this->policy.hint_state(this->binary_state);
-
-				#pragma omp parallel for num_threads(num_threads)
-				for (int i = 0; i < num_threads; ++i) {
-					local_fields_out[i] = this->policy.compute_local_field(
-						this->binary_state,
-						update_indexes[i], false
-					);
+				#pragma omp parallel num_threads(num_threads)
+				{
+					#pragma omp for 
+					for (int i = 0; i < num_threads; ++i) {
+						local_fields_out[i] = this->policy.compute_local_field(
+							this->binary_state,
+							update_indexes[i], false
+						);
+					}
 				}
-
 				for (int i = 0; i < uc.group_size; ++i)
 					this->binary_state.set_value(update_indexes[i],
 						compute_value(local_fields_out[i], temp_sched->get_temp() ));
@@ -152,14 +151,16 @@ public:
 				this->notify_state(update_indexes, this->binary_state);
 			}
 
-			if (schedule.do_temperature)
+			if (schedule.do_temperature) {
 				this->notify_temperature(temp_sched->get_temp());
-
-			if (schedule.do_order_parameter)
+			}
+			if (schedule.do_order_parameter) {
 				this->compute_order_parameter(it);
+			}
 			// This internally calls notify_energy()
-			if (schedule.do_energy)
+			if (schedule.do_energy) {
 				this->compute_energy();
+			}
 
 
 			// Update the temperature schedule. This is COMMON for all threads operating in

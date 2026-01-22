@@ -109,9 +109,11 @@ public:
 	// See comment above ^
 	ComputationSchedule fix_computation_schedule() {
 		ComputationSchedule sched;
+		sched.do_energy = sched.do_temperature = sched.do_order_parameter = false;
 		for (auto* o : loggers) {
-			if (o->is_interested_in(Event::EnergyChanged))
+			if (o->is_interested_in(Event::EnergyChanged)) {
 				sched.do_energy = true;
+			}
 			if (o->is_interested_in(Event::OrderParameterChanged))
 				sched.do_temperature = true;
 			if (o->is_interested_in(Event::TemperatureChanged))

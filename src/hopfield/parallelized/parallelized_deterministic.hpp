@@ -77,15 +77,12 @@ public:
 				NetUtils::random_subset(update_indexes, this->network_size, uc.group_size);
 				this->policy.hint_state(this->binary_state);
 
-				#pragma omp parallel num_threads(num_threads)
-				{
-					#pragma omp parallel for
-					for (int i = 0; i < num_threads; ++i) {
-						local_fields_out[i] = this->policy.compute_local_field(
-							this->binary_state,
-							update_indexes[i], false
-						);
-					}
+				#pragma omp parallel for num_threads(num_threads)
+				for (int i = 0; i < num_threads; ++i) {
+					local_fields_out[i] = this->policy.compute_local_field(
+						this->binary_state,
+						update_indexes[i], false
+					);
 				}
 
 				for (int i = 0; i < uc.group_size; ++i)

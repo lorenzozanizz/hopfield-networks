@@ -107,7 +107,6 @@ int main() {
 	std::cout << "> Begin mapping the dataset into nonlinear embedding " << std::endl;
 
 	Utilities::eigen_init_parallel(-1);
-	Eigen::setNbThreads(1);
 
 	// On my architecture, 5 threads is optimal for this neural network architecture. 
 	// It is probably a balance between thread keeping overhead and matmul execution. 
@@ -127,7 +126,7 @@ int main() {
 	// Now declare the machinery for the neural network classifier to test the
 	// efficacy of the reservoir 
 
-	constexpr const auto N = 2000;
+	constexpr const auto N = 1000;
 
 	std::vector<int> units = { reservoir_size, N, N, 5 };
 	auto relu = Activations<float>::relu;
